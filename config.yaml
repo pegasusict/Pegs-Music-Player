@@ -1,0 +1,34 @@
+version: 1
+db_path: ~/.music_player.db
+base_folder: ~/Music
+average_track_duration_seconds: 245
+supported_extensions:
+- .mp3
+- .flac
+- .ogg
+- .m4a
+- .wav
+- .aac
+- .mp2
+daily_folder: daily
+timeslots:
+- name: morning
+  start: 07:00
+  end: '13:00'
+  folders:
+  - morning
+  - shared
+  each_iteration_folder: every_morning
+- name: afternoon
+  start: '13:00'
+  end: 03:00
+  folders:
+  - afternoon
+  - shared
+  each_iteration_folder: every_afternoon
+- name: night
+  start: 03:00
+  end: 07:00
+  folders:
+  - NOT_IN_USE
+  each_iteration_folder: NOT_IN_USE
