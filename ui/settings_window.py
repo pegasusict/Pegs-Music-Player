@@ -1,4 +1,4 @@
-from gi.repository import Gtk, Pango
+from gi.repository import Gtk
 import logging
 import config
 
@@ -114,24 +114,32 @@ class SettingsWindow(Gtk.Window):
 
         frame = Gtk.Frame()
         inner_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        inner_box.set_margin_all(10)
+        inner_box.set_margin_top(10)
+        inner_box.set_margin_bottom(10)
+        inner_box.set_margin_start(10)
+        inner_box.set_margin_end(10)
         frame.set_child(inner_box)
 
         # Row 1: Name and Delete
         top_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        name_entry = Gtk.Entry(text=slot_data["name"], placeholder_text="Slot Name")
+        name_entry = Gtk.Entry()
+        name_entry.set_text(slot_data.get("name", "new_slot"))
+        name_entry.set_placeholder_text("Slot Name")
         name_entry.set_hexpand(True)
         top_row.append(name_entry)
         
         del_btn = Gtk.Button(icon_name="edit-delete-symbolic")
-        del_btn.connect("clicked", lambda _: self._remove_timeslot_ui(frame, widgets))
         top_row.append(del_btn)
         inner_box.append(top_row)
 
         # Row 2: Times
         time_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        start_entry = Gtk.Entry(text=slot_data["start"], placeholder_text="Start (HH:MM)")
-        end_entry = Gtk.Entry(text=slot_data["end"], placeholder_text="End (HH:MM)")
+        start_entry = Gtk.Entry()
+        start_entry.set_text(slot_data.get("start", "00:00"))
+        start_entry.set_placeholder_text("Start (HH:MM)")
+        end_entry = Gtk.Entry()
+        end_entry.set_text(slot_data.get("end", "00:00"))
+        end_entry.set_placeholder_text("End (HH:MM)")
         time_row.append(Gtk.Label(label="From:"))
         time_row.append(start_entry)
         time_row.append(Gtk.Label(label="To:"))
@@ -140,14 +148,21 @@ class SettingsWindow(Gtk.Window):
 
         # Row 3: Folders
         folders_str = ", ".join(slot_data.get("folders", []))
-        folders_entry = Gtk.Entry(text=folders_str, placeholder_text="Folders (comma separated)")
+        folders_entry = Gtk.Entry()
+        folders_entry.set_text(folders_str)
+        folders_entry.set_placeholder_text("Folders (comma separated)")
         inner_box.append(Gtk.Label(label="Folders:", xalign=0))
         inner_box.append(folders_entry)
 
         iter_folder = slot_data.get("each_iteration_folder", "NOT_IN_USE")
-        iter_entry = Gtk.Entry(text=iter_folder, placeholder_text="Iteration Folder")
+        iter_entry = Gtk.Entry()
+        iter_entry.set_text(iter_folder)
+        iter_entry.set_placeholder_text("Iteration Folder")
         inner_box.append(Gtk.Label(label="Once-per-cycle Folder:", xalign=0))
         inner_box.append(iter_entry)
+
+        # Connect delete button now that entries are created
+        del_btn.connect("clicked", lambda _: self._remove_timeslot_ui(frame, widgets))
 
         widgets = {
             "name": name_entry, "start": start_entry, "end": end_entry,

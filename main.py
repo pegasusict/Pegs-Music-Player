@@ -20,7 +20,7 @@ import gi  # type: ignore[import]
 gi.require_version("Gdk", "4.0")
 gi.require_version("Gtk", "4.0")
 logging.basicConfig(
-    level=logging.WARNING,
+    level=logging.DEBUG,
     format='%(asctime)s - %(levelname)s - %(message)s',
     filename='/home/pegasus/pegasus_music_player.log',
     filemode='w'

@@ -19,8 +19,22 @@ timeslots:
   - morning
   - shared
   each_iteration_folder: every_morning
-- name: afternoon
+- name: afternoon-1
   start: '13:00'
+  end: '14:00'
+  folders:
+  - afternoon
+  - shared
+  each_iteration_folder: every_afternoon
+- name: naptime
+  start: '14:00'
+  end: '16:00'
+  folders:
+  - morning
+  - shared
+  each_iteration_folder: NOT_IN_USE
+- name: afternoon-2
+  start: '16:00'
   end: 03:00
   folders:
   - afternoon

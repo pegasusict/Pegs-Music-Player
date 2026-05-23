@@ -1,6 +1,7 @@
 import threading
 from gi.repository import Gtk, GLib, Pango
 
+import logging
 from ui.widgets.playback_panel import PlaybackPanel
 from ui.widgets.queue_panel import QueuePanel
 from ui.widgets.library_panel import LibraryPanel
@@ -8,6 +9,8 @@ from domain.track import Track
 
 
 class MainWindow(Gtk.ApplicationWindow):
+    logger = logging.getLogger(__name__)
+
     """Main application window for the music player."""
     BASE_TITLE = "Pegasus' Music Player"
     def __init__(self, app_controller):
@@ -90,10 +93,14 @@ class MainWindow(Gtk.ApplicationWindow):
 
     def on_open_settings(self, _btn):
         """Opens the configuration settings window."""
+        self.logger.debug("Attempting to open settings window.")
         from ui.settings_window import SettingsWindow
-        settings_win = SettingsWindow(self.app)
-        settings_win.set_transient_for(self)
-        settings_win.present()
+        try:
+            settings_win = SettingsWindow(self.app)
+            settings_win.set_transient_for(self)
+            settings_win.present()
+        except Exception as e:
+            self.logger.error(f"Failed to open settings window: {e}", exc_info=True)
 
     def on_rescan_library(self):
         """Rescans the library in a background thread to prevent UI freezing."""
