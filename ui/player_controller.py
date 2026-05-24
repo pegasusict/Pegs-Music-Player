@@ -1,6 +1,7 @@
 # ui/player_controller.py
 
 from gi.repository import GLib
+
 from domain.track import Track
 from playback.player import PlaybackEngine
 

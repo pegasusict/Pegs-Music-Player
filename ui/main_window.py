@@ -1,11 +1,12 @@
-import threading
-from gi.repository import Gtk, GLib, Pango
-
 import logging
-from ui.widgets.playback_panel import PlaybackPanel
-from ui.widgets.queue_panel import QueuePanel
-from ui.widgets.library_panel import LibraryPanel
+import threading
+
+from gi.repository import GLib, Gtk, Pango
+
 from domain.track import Track
+from ui.widgets.playback_panel import PlaybackPanel
+from ui.widgets.library_panel import LibraryPanel
+from ui.widgets.queue_panel import QueuePanel
 
 
 class MainWindow(Gtk.ApplicationWindow):

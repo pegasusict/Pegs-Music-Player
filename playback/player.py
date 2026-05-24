@@ -1,10 +1,9 @@
-from pathlib import Path
 import logging
 import math
+from pathlib import Path
 
 import gi
 gi.require_version("Gst", "1.0")
-
 from gi.repository import Gst, GLib
 
 logger = logging.getLogger(__name__)

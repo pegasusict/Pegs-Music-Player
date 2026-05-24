@@ -1,13 +1,13 @@
 # runtime/slot_runtime.py
 
 import logging
+from pathlib import Path
 import threading
 import time
-from pathlib import Path
 from typing import Optional
 
-from scheduler.timeslot_scheduler import TimeslotScheduler
 from infrastructure.file_watcher import FileWatcher
+from scheduler.timeslot_scheduler import TimeslotScheduler
 
 
 logger = logging.getLogger(__name__)

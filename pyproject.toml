@@ -1,0 +1,26 @@
+[tool.isort]
+# This configuration matches the 3-section sort requested:
+# 1. Standard Library
+# 2. External Packages
+# 3. Local Modules
+profile = "black"
+line_length = 88
+sections = ["STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+known_first_party = [
+    "app_queue",
+    "domain",
+    "infrastructure",
+    "persistence",
+    "playback",
+    "repository",
+    "runtime",
+    "scheduler",
+    "ui",
+    "config"
+]
+
+[tool.ruff]
+select = ["I"] # Enable isort-style import sorting rules
+
+[tool.ruff.lint.isort]
+known-first-party = ["app_queue", "domain", "infrastructure", "persistence", "playback", "repository", "runtime", "scheduler", "ui", "config"]

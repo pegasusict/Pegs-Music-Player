@@ -1,7 +1,7 @@
-import logging
-import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass
+import logging
+import sqlite3
 
 logger = logging.getLogger(__name__)
 

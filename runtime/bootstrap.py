@@ -1,27 +1,26 @@
-import logging
-import threading
 from datetime import datetime
+import logging
 from pathlib import Path
+import threading
 from typing import Callable, Optional
 
-import config
+from gi.repository import GLib # Import GLib for idle_add
 
 from app_queue.queue_manager import QueueManager
+import config
 from domain.timeslot import Timeslot
 from domain.track import Track
+from infrastructure.database import Database
 from infrastructure.file_watcher import FileWatcher
 from infrastructure.spread_state_repository import SpreadStateRepository
+from persistence.sqlite_history_repository import SqlitePlayHistoryRepository
+from playback.player import PlaybackEngine
 from repository.music_repository import MusicRepository, ScanResult
 from runtime.slot_runtime import SlotRuntime
 from scheduler.period_target_calculator import PeriodTargetCalculator
 from scheduler.selection_engine import SelectionEngine
 from scheduler.spread_controller import SpreadController
 from scheduler.timeslot_scheduler import TimeslotScheduler
-
-from persistence.sqlite_history_repository import SqlitePlayHistoryRepository
-from infrastructure.database import Database
-from playback.player import PlaybackEngine
-from gi.repository import GLib # Import GLib for idle_add
 
 logger = logging.getLogger(__name__)
 

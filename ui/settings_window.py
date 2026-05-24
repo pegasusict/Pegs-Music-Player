@@ -1,8 +1,10 @@
-from gi.repository import Gtk
-import logging
-import config
 import copy
+import logging
 from pathlib import Path
+
+from gi.repository import Gtk
+
+import config
 
 logger = logging.getLogger(__name__)
 

@@ -1,10 +1,11 @@
 import logging
-from gi.repository import Gdk, Gtk, GLib, Gio
 
+from gi.repository import Gdk, Gio, GLib, Gtk
+
+import config
+from infrastructure.logging_setup import init_logging
 from ui.main_window import MainWindow
 from ui.player_controller import PlayerController
-from infrastructure.logging_setup import init_logging
-import config
 
 logger = logging.getLogger(__name__)
 

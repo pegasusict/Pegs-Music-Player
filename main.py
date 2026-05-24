@@ -15,16 +15,16 @@ Roadmap:
 
 import logging
 import sys
-import gi  # type: ignore[import]
 
+import gi  # type: ignore[import]
 gi.require_version("Gdk", "4.0")
 gi.require_version("Gtk", "4.0")
 
+import config
 from infrastructure.database import Database
+from infrastructure.logging_setup import init_logging
 from runtime.bootstrap import Application
 from ui.application import MusicGTKApp
-import config
-from infrastructure.logging_setup import init_logging
 
 
 def main():

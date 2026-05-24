@@ -1,5 +1,5 @@
-import threading
 from collections import deque
+import threading
 
 from domain.track import Track
 from infrastructure.database import Database

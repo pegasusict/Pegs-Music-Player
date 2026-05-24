@@ -1,10 +1,11 @@
-import yaml
+import copy
+from datetime import time
 import logging
 from pathlib import Path
 import sys
-from datetime import time
 from typing import Any, Dict
-import copy
+
+import yaml
 
 logger = logging.getLogger(__name__)
 
