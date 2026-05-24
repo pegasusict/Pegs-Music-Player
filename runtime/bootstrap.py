@@ -6,17 +6,18 @@ from typing import Callable, Optional
 
 import config
 
-from infrastructure.spread_state_repository import SpreadStateRepository
-from scheduler.period_target_calculator import PeriodTargetCalculator
-from scheduler.spread_controller import SpreadController
-from scheduler.timeslot_scheduler import TimeslotScheduler
+from app_queue.queue_manager import QueueManager
 from domain.timeslot import Timeslot
 from domain.track import Track
-from runtime.slot_runtime import SlotRuntime
 from infrastructure.file_watcher import FileWatcher
+from infrastructure.spread_state_repository import SpreadStateRepository
 from repository.music_repository import MusicRepository, ScanResult
-from app_queue.queue_manager import QueueManager
+from runtime.slot_runtime import SlotRuntime
+from scheduler.period_target_calculator import PeriodTargetCalculator
 from scheduler.selection_engine import SelectionEngine
+from scheduler.spread_controller import SpreadController
+from scheduler.timeslot_scheduler import TimeslotScheduler
+
 from persistence.sqlite_history_repository import SqlitePlayHistoryRepository
 from infrastructure.database import Database
 from playback.player import PlaybackEngine
@@ -35,22 +36,22 @@ class Application:
     """
 
     def __init__(self, database: Database):
-        logging.debug("  - Bootstrap: Initializing Application...")
+        logger.debug("Initializing Application bootstrap...")
         self.database = database
 
         # Load state from DB early to identify potential locking issues 
         # before initializing heavy external components like GStreamer.
-        logging.debug("  - Bootstrap: Loading saved volume from database...")
+        logger.debug("Loading saved volume from database...")
         saved_volume = self.load_volume()
-        logging.debug(f"  - Bootstrap: Volume loaded ({saved_volume}).")
+        logger.debug(f"Volume loaded: {saved_volume}")
 
-        logging.debug("  - Bootstrap: Initializing repositories...")
+        logger.debug("Initializing repositories...")
         # Core Infrastructure
         self.music_repo = MusicRepository(database)
         self.queue_manager = QueueManager()
         
         # Scheduler
-        logging.debug("  - Bootstrap: Building timeslots...")
+        logger.debug("Building timeslots...")
         self.scheduler = TimeslotScheduler(self._build_timeslots_from_raw_config(config.load_config()))
         
         # Spread Infrastructure
@@ -58,12 +59,12 @@ class Application:
         self.daily_spread = SpreadController("daily",self.spread_repo)
         self.slot_spread = SpreadController("slot", self.spread_repo)
 
-        logging.debug("  - Bootstrap: Setting up calculators and history...")
+        logger.debug("Setting up calculators and history...")
         self.history_repo = SqlitePlayHistoryRepository(database) # Keep this line
         self.period_calculator = PeriodTargetCalculator(self.history_repo, self.music_repo) # Pass music_repo
         
         # FileWatcher
-        logging.debug("  - Bootstrap: Initializing FileWatcher...")
+        logger.debug("Initializing FileWatcher...")
         self.filewatcher = FileWatcher(
             folders=[],  # will be configured by SlotRuntime
             supported_extensions=config.SUPPORTED_EXTENSIONS,
@@ -71,7 +72,7 @@ class Application:
         )
         
         # Slot Runtime (scheduler + watcher integration)
-        logging.debug("  - Bootstrap: Initializing SlotRuntime and SelectionEngine...")
+        logger.debug("Initializing SlotRuntime and SelectionEngine...")
         self.slot_runtime = SlotRuntime(
             scheduler=self.scheduler,
             filewatcher=self.filewatcher,
@@ -92,14 +93,13 @@ class Application:
         self.selection_engine.set_shuffle_enabled(initial_shuffle_state)
 
         # Playback
-        logging.debug("  - Bootstrap: Initializing PlaybackEngine (GStreamer)...")
+        logger.debug("Initializing PlaybackEngine (GStreamer)...")
         self.playback_engine = PlaybackEngine()
-        logging.debug("  - Bootstrap: Calling load_volume() (Database query)...")
+        logger.debug("Calling load_volume() (Database query)...")
         saved_volume = self.load_volume()
-        logging.debug(f"  - Bootstrap: load_volume() returned {saved_volume}. Applying to engine...")
+        logger.debug(f"load_volume() returned {saved_volume}. Applying to engine...")
         self.playback_engine.set_volume(saved_volume)
-        logging.debug("  - Bootstrap: Engine volume set.")
-        logging.debug("  - Bootstrap: Finalizing initialization...")
+        logger.debug("Finalizing bootstrap initialization.")
 
         self._running = False
         self._autoqueue_enabled: bool = self.load_autoqueue_state()
@@ -413,6 +413,10 @@ class Application:
         # Reload the configuration to ensure all module-level constants are updated
         # and then apply the changes to the running application.
         updated_raw_config = config.load_config()
+
+        from infrastructure.logging_setup import init_logging
+        init_logging(config.LOG_LEVEL, config.LOG_FILE)
+
         self._rebuild_scheduler_and_notify_slot_runtime(updated_raw_config)
 
     def _rebuild_scheduler_and_notify_slot_runtime(self, raw_config: dict):

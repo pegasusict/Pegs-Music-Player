@@ -3,7 +3,10 @@ from gi.repository import Gdk, Gtk, GLib, Gio
 
 from ui.main_window import MainWindow
 from ui.player_controller import PlayerController
+from infrastructure.logging_setup import init_logging
+import config
 
+logger = logging.getLogger(__name__)
 
 class MusicGTKApp(Gtk.Application):
     def __init__(self, backend_app):
@@ -12,13 +15,15 @@ class MusicGTKApp(Gtk.Application):
             flags=Gio.ApplicationFlags.NON_UNIQUE
         )
 
+        # Initialize logging for the entire app session
+        init_logging(config.LOG_LEVEL, config.LOG_FILE)
+
         self.backend_app = backend_app
         self.controller = PlayerController(backend_app)
 
     def do_startup(self):
-        logging.debug("do_startup: Starting Gtk.Application.do_startup")
+        logger.debug("Starting Gtk.Application.do_startup")
         Gtk.Application.do_startup(self)
-        logging.debug("do_startup: Gtk.Application.do_startup completed.")
         try:
             provider = Gtk.CssProvider()
             provider.load_from_data(b"""
@@ -27,7 +32,7 @@ class MusicGTKApp(Gtk.Application):
                 color: white;
             }
             """)
-            logging.debug("do_startup: CSS Provider loaded.")
+            logger.debug("CSS Provider loaded.")
             display = Gdk.Display.get_default()
             if display:
                 Gtk.StyleContext.add_provider_for_display(
@@ -35,14 +40,14 @@ class MusicGTKApp(Gtk.Application):
                     provider,
                     Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
                 )
-                logging.debug("do_startup: CSS Provider added to display.")
+                logger.debug("CSS Provider added to display.")
             else:
-                logging.warning("do_startup: Gdk.Display.get_default() returned None. Skipping CSS loading.")
+                logger.warning("Gdk.Display.get_default() returned None. Skipping CSS loading.")
         except Exception as e:
-            logging.critical(f"do_startup: An unexpected error occurred during CSS setup: {e}", exc_info=True)
+            logger.critical(f"An unexpected error occurred during CSS setup: {e}", exc_info=True)
 
     def do_activate(self):
-        logging.info("GTK Application Activated: Creating Main Window")
+        logger.info("GTK Application Activated: Creating Main Window")
         win = MainWindow(self.controller)
         win.set_application(self)
         self.controller.set_main_window(win) # Pass the main window to the controller

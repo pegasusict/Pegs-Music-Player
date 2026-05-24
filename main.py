@@ -8,7 +8,7 @@
       see the yaml file for further information on how to configure the application.
 
 Roadmap:
-- [ ] Github Repo and Documentation
+- [ ] Documentation
 """
 
 
@@ -19,23 +19,19 @@ import gi  # type: ignore[import]
 
 gi.require_version("Gdk", "4.0")
 gi.require_version("Gtk", "4.0")
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    filename='/home/pegasus/pegasus_music_player.log',
-    filemode='w'
-)
 
 from infrastructure.database import Database
 from runtime.bootstrap import Application
 from ui.application import MusicGTKApp
-from config import DB_PATH
+import config
+from infrastructure.logging_setup import init_logging
 
 
 def main():
+    init_logging(config.LOG_LEVEL, config.LOG_FILE)
     logging.info("Starting Pegasus Music Player...")
     logging.info("Initializing Database...")
-    database = Database(DB_PATH)
+    database = Database(config.DB_PATH)
     logging.info("Database Initialized. Initializing Backend Application...")
     backend = Application(database=database)
     logging.info("Backend Application Initialized. Initializing GTK Application...")

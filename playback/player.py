@@ -1,6 +1,7 @@
 from pathlib import Path
 import logging
 import math
+
 import gi
 gi.require_version("Gst", "1.0")
 
@@ -8,6 +9,16 @@ from gi.repository import Gst, GLib
 
 logger = logging.getLogger(__name__)
 
+
+COMPRESSOR_SETTINGS = {
+    "rms-peak": 0.0,
+    "attack-time": 1.5,
+    "release-time": 32.5,
+    "threshold-level": -20.0,
+    "ratio": 4.0,
+    "knee-radius": 2.0,
+    "makeup-gain": 0.0,
+}
 
 class PlaybackEngine:
     def __init__(self):
@@ -26,16 +37,21 @@ class PlaybackEngine:
         self._bus.add_signal_watch()
         self._bus.connect("message", self._on_message)
 
-        # Keep a limiter after per-track ReplayGain volume adjustment to catch peaks.
+        # A processing chain consisting of a native ReplayGain element and LADSPA dynamics plugins using labels.
+        # Elements: rgvolume (Native), sc4 (SC4 Compressor), fast-lookahead-limiter (Fast Lookahead Limiter).
         try:
             norm_filter = Gst.parse_bin_from_description(
-                "audioconvert ! audioresample ! rglimiter ! audioconvert", True
+                "audioconvert ! audioresample ! "
+                "rgvolume ! "
+                "ladspa-sc4-1882-so-sc4 " + " ".join(f"{k}={v}" for k, v in COMPRESSOR_SETTINGS.items()) + " ! "
+                "ladspa-fast-lookahead-limiter-1913-so-fastlookaheadlimiter limit=-1 release-time=0.1 ! "
+                "audioconvert", True
             )
             self._player.set_property("audio-filter", norm_filter)
             self._limiter_available = True
         except Exception as e:
             self._limiter_available = False
-            logger.warning("Audio limiter filter could not be initialized: %s", e)
+            logger.warning("LADSPA audio processing chain could not be initialized: %s", e)
 
         self._on_track_end = None
         self._on_error = None

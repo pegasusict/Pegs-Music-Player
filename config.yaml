@@ -11,6 +11,9 @@ supported_extensions:
 - .aac
 - .mp2
 daily_folder: daily
+logging:
+  level: INFO
+  file: ~/.cache/pegasus-player/pegasus_player.log
 timeslots:
 - name: morning
   start: 07:00

@@ -18,6 +18,8 @@ SUPPORTED_EXTENSIONS: set[str]
 AVERAGE_TRACK_DURATION_SECONDS: int
 DAILY_FOLDER: str
 TIMESLOTS: list[dict[str, Any]]
+LOG_LEVEL: str
+LOG_FILE: str
 
 # Define the full default configuration schema
 DEFAULT_CONFIG_SCHEMA: Dict[str, Any] = {
@@ -27,6 +29,10 @@ DEFAULT_CONFIG_SCHEMA: Dict[str, Any] = {
     "average_track_duration_seconds": 210,
     "supported_extensions": [".mp3", ".flac", ".ogg", ".m4a", ".wav", ".aac", ".mp2"], # Supported audio file extensions
     "daily_folder": "NOT_IN_USE", # Folder for daily special tracks (e.g., daily jingles)
+    "logging": {
+        "level": "INFO",
+        "file": "~/.cache/pegasus-player/pegasus_player.log"
+    },
     "timeslots": [
         {
             "name": "morning",
@@ -149,13 +155,15 @@ def load_config() -> dict[str, Any]:
 
 def _update_module_globals(cfg: Dict[str, Any]):
     """Updates the module-level global variables with values from the provided config."""
-    global DB_PATH, BASE_FOLDER, SUPPORTED_EXTENSIONS, AVERAGE_TRACK_DURATION_SECONDS, DAILY_FOLDER, TIMESLOTS
+    global DB_PATH, BASE_FOLDER, SUPPORTED_EXTENSIONS, AVERAGE_TRACK_DURATION_SECONDS, DAILY_FOLDER, TIMESLOTS, LOG_LEVEL, LOG_FILE
     
     DB_PATH = str(Path(cfg["db_path"]).expanduser())
     BASE_FOLDER = Path(cfg["base_folder"]).expanduser()
     SUPPORTED_EXTENSIONS = set(cfg["supported_extensions"])
     AVERAGE_TRACK_DURATION_SECONDS = int(cfg["average_track_duration_seconds"])
     DAILY_FOLDER = str(cfg["daily_folder"])
+    LOG_LEVEL = cfg.get("logging", {}).get("level", "INFO")
+    LOG_FILE = cfg.get("logging", {}).get("file", "~/.cache/pegasus-player/pegasus_player.log")
 
     # Parse timeslots into a format compatible with the domain model
     TIMESLOTS = []
