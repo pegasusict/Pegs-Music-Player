@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 
 from gi.repository import Gdk, Gio, GLib, Gtk
 
@@ -27,13 +28,9 @@ class MusicGTKApp(Gtk.Application):
         Gtk.Application.do_startup(self)
         try:
             provider = Gtk.CssProvider()
-            provider.load_from_data(b"""
-            .playing {
-                background-color: #3465a4;
-                color: white;
-            }
-            """)
-            logger.debug("CSS Provider loaded.")
+            css_path = Path(__file__).parent.parent / "resources" / "style.css"
+            provider.load_from_path(str(css_path))
+            logger.debug(f"CSS Provider loaded from {css_path}.")
             display = Gdk.Display.get_default()
             if display:
                 Gtk.StyleContext.add_provider_for_display(

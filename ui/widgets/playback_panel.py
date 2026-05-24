@@ -58,7 +58,7 @@ class PlaybackPanel(Gtk.Box):
         self.append(self.seek)
         self.seek.connect("value-changed", self.on_seek)
 
-        self.volume_label = Gtk.Label(label="Volume")
+        self.volume_label = self.create_label("Volume")
         self.append(self.volume_label)
 
         self.volume = Gtk.Scale.new_with_range(
@@ -73,17 +73,19 @@ class PlaybackPanel(Gtk.Box):
         self.append(self.volume)
         
         # Shuffle button
-        self.shuffle_button = Gtk.Button()
-        self.shuffle_button.set_icon_name("media-playlist-shuffle") # Using a standard shuffle icon
-        self.shuffle_button.set_tooltip_text("Toggle Shuffle")
-        self.shuffle_button.connect("clicked", self.on_shuffle_button_clicked)
+        self.shuffle_button = self.create_button(
+            icon_name="media-playlist-shuffle", 
+            tooltip="Toggle Shuffle", 
+            callback=self.on_shuffle_button_clicked
+        )
         self.playback_controls.append(self.shuffle_button) # Add to playback controls
 
         # Stop at end button
-        self.stop_at_end_button = Gtk.Button()
-        self.stop_at_end_button.set_icon_name("media-playback-stop") # Using a standard stop icon
-        self.stop_at_end_button.set_tooltip_text("Stop after current track")
-        self.stop_at_end_button.connect("clicked", self.on_stop_at_end_button_clicked)
+        self.stop_at_end_button = self.create_button(
+            icon_name="media-playback-stop",
+            tooltip="Stop after current track",
+            callback=self.on_stop_at_end_button_clicked
+        )
         self.playback_controls.append(self.stop_at_end_button)
 
     # ---------------------------------------------------------
@@ -145,14 +147,10 @@ class PlaybackPanel(Gtk.Box):
         if self.resume_last_button.get_visible() != new_resume_visible:
             self.resume_last_button.set_visible(new_resume_visible)
 
-        error_text = ""
-        if status.get("last_error"):
-            error_text = f"Playback error: {status['last_error']}"
-        
-        if self.error_label.get_text() != error_text:
-            self.error_label.set_text(error_text)
-            self.error_label.set_visible(bool(error_text))
-        
+        error_text = f"Playback error: {status['last_error']}" if status.get("last_error") else ""
+        self.update_label(self.error_label, error_text)
+        self.error_label.set_visible(bool(error_text))
+
         # Update shuffle button appearance
         if status["shuffle_enabled"]:
             self.shuffle_button.add_css_class("suggested-action") # Highlight if active
@@ -177,15 +175,11 @@ class PlaybackPanel(Gtk.Box):
         position = engine.get_position()
 
         if duration > 0 and position >= 0:
-            # frac = position / duration
-            # self.progress.set_fraction(frac)
-            
             new_time_text = (
-                f"{self.main_window._format_time(position)} / {self.main_window._format_time(duration)} "
-                f"(-{self.main_window._format_time(max(0, duration - position))})"
+                f"{self.format_time(position)} / {self.format_time(duration)} "
+                f"(-{self.format_time(max(0, duration - position))})"
             )
-            if self.time_label.get_text() != new_time_text:
-                self.time_label.set_text(new_time_text)
+            self.update_label(self.time_label, new_time_text)
 
             self.seek.handler_block_by_func(self.on_seek)
             # Only update range if it changed (new track)

@@ -4,12 +4,13 @@ import threading
 from gi.repository import GLib, Gtk, Pango
 
 from domain.track import Track
+from ui.ui_helpers import UIHelpersMixin
 from ui.widgets.playback_panel import PlaybackPanel
 from ui.widgets.library_panel import LibraryPanel
 from ui.widgets.queue_panel import QueuePanel
 
 
-class MainWindow(Gtk.ApplicationWindow):
+class MainWindow(Gtk.ApplicationWindow, UIHelpersMixin):
     logger = logging.getLogger(__name__)
 
     """Main application window for the music player."""
@@ -36,36 +37,32 @@ class MainWindow(Gtk.ApplicationWindow):
         self.page.append(self.status_bar)
 
         # Status bar labels with constrained width to prevent Pango issues
-        self.status_slot_label = Gtk.Label(label="Slot: -", ellipsize=Pango.EllipsizeMode.END, max_width_chars=15)
+        self.status_slot_label = self.create_label("Slot: -", max_chars=15)
         self.status_bar.append(self.status_slot_label)
 
-        self.status_library_label = Gtk.Label(label="Library: 0 tracks", ellipsize=Pango.EllipsizeMode.END, max_width_chars=30)
+        self.status_library_label = self.create_label("Library: 0 tracks", max_chars=30)
         self.status_bar.append(self.status_library_label)
 
-        self.status_queue_label = Gtk.Label(
-            label="Queue: 0 manual, 0 auto", ellipsize=Pango.EllipsizeMode.END, max_width_chars=30
-        )
+        self.status_queue_label = self.create_label("Queue: 0 manual, 0 auto", max_chars=30)
         self.status_bar.append(self.status_queue_label)
 
-        self.status_playback_label = Gtk.Label(
-            label="Playback: stopped", ellipsize=Pango.EllipsizeMode.END, max_width_chars=20
-        )
+        self.status_playback_label = self.create_label("Playback: stopped", max_chars=20)
         self.status_bar.append(self.status_playback_label)
 
-        self.status_scan_label = Gtk.Label(label="Last scan: never")
+        self.status_scan_label = self.create_label("Last scan: never")
         self.status_bar.append(self.status_scan_label)
 
-        self.rescan_button = Gtk.Button(label="Rescan")
-        self.rescan_button.connect("clicked", lambda _: self.on_rescan_library())
+        self.rescan_button = self.create_button("Rescan", callback=lambda _: self.on_rescan_library())
         self.status_bar.append(self.rescan_button)
 
-        self.metadata_button = Gtk.Button(label="Metadata")
-        self.metadata_button.set_tooltip_text("Refresh tags, durations, and ReplayGain data for registered tracks")
-        self.metadata_button.connect("clicked", lambda _: self.on_refresh_metadata())
+        self.metadata_button = self.create_button(
+            "Metadata", 
+            tooltip="Refresh tags, durations, and ReplayGain data", 
+            callback=lambda _: self.on_refresh_metadata()
+        )
         self.status_bar.append(self.metadata_button)
 
-        self.settings_button = Gtk.Button(label="Settings")
-        self.settings_button.connect("clicked", self.on_open_settings)
+        self.settings_button = self.create_button("Settings", callback=self.on_open_settings)
         self.status_bar.append(self.settings_button)
 
         self.root = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
@@ -167,7 +164,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.current_track_id = new_id
         if track:
             text = f"Now playing: {track.artist} - {track.title}"
-            self._update_label(self.playback_panel.track_label, text)
+            self.update_label(self.playback_panel.track_label, text)
             new_title = f"{track.artist} - {track.title} ~ {self.BASE_TITLE}"
             if self.get_title() != new_title:
                 self.set_title(new_title)
@@ -175,7 +172,7 @@ class MainWindow(Gtk.ApplicationWindow):
             self.library_panel.refresh_recently_played_display()
         else:
             self.current_track_id = None
-            self._update_label(self.playback_panel.track_label, "No track playing")
+            self.update_label(self.playback_panel.track_label, "No track playing")
             self.set_title(self.BASE_TITLE)
 
     def refresh_queue(self):
@@ -183,41 +180,35 @@ class MainWindow(Gtk.ApplicationWindow):
         self.queue_panel.refresh_queue_display()
         return True
 
-        
-    def _update_label(self, label_widget: Gtk.Label, text: str):
-        """Update a label only if the text has changed to prevent layout churn."""
-        if label_widget.get_text() != text:
-            label_widget.set_text(text)
-
     def refresh_status(self):
         """Refresh the status bar and delegate updates to panels."""
         status = self.app.get_status()
         last_scan_at = status["last_scan_at"]
         scan = status["last_scan_result"]
 
-        self._update_label(self.status_slot_label, f"Slot: {status['slot']}")
-        self._update_label(
+        self.update_label(self.status_slot_label, f"Slot: {status['slot']}")
+        self.update_label(
             self.status_library_label,
             f"Library: {status['library_count']} tracks, "
             f"RG: {status['replaygain_count']}"
         )
-        self._update_label(self.status_queue_label, 
+        self.update_label(self.status_queue_label, 
             f"Queue: {status['manual_count']} manual, {status['auto_count']} auto"
         )
-        self._update_label(self.status_playback_label, f"Playback: {status['playback_state']}")
+        self.update_label(self.status_playback_label, f"Playback: {status['playback_state']}")
 
         # Delegate playback-specific info to the playback panel
         self.playback_panel.update_playback_info(status)
         self.update_track(status["current_track"])
 
         if last_scan_at:
-            self._update_label(self.status_scan_label,
+            self.update_label(self.status_scan_label,
                 f"Last scan: {last_scan_at.strftime('%H:%M:%S')} "
                 f"({scan.scanned_files} files, {scan.stale_tracks_removed} stale, "
                 f"{scan.metadata_failures} metadata issues)"
             )
         else:
-            self._update_label(self.status_scan_label, "Last scan: never")
+            self.update_label(self.status_scan_label, "Last scan: never")
 
         return True
 
@@ -327,14 +318,3 @@ class MainWindow(Gtk.ApplicationWindow):
         """Persist playback state periodically to ensure we don't lose progress on crashes."""
         self.app.persist_state()
         return True
-
-    def _format_time(self, nanoseconds: int) -> str:
-        """Convert nanoseconds to a human-readable time format."""
-        total_seconds = max(0, int(nanoseconds / 1_000_000_000))
-        minutes, seconds = divmod(total_seconds, 60)
-        hours, minutes = divmod(minutes, 60)
-
-        if hours:
-            return f"{hours}:{minutes:02d}:{seconds:02d}"
-
-        return f"{minutes}:{seconds:02d}"

@@ -5,10 +5,11 @@ from pathlib import Path
 from gi.repository import Gtk
 
 import config
+from ui.ui_helpers import UIHelpersMixin
 
 logger = logging.getLogger(__name__)
 
-class SettingsWindow(Gtk.Window):
+class SettingsWindow(Gtk.Window, UIHelpersMixin):
     def __init__(self, controller):
         super().__init__(title="Settings", modal=True)
         self.controller = controller
@@ -40,10 +41,7 @@ class SettingsWindow(Gtk.Window):
         scroll.set_child(content_box)
 
         # Library & General Section
-        general_header = Gtk.Label(label="Library & General")
-        general_header.add_css_class("title-4")
-        general_header.set_xalign(0)
-        content_box.append(general_header)
+        content_box.append(self.create_label("Library & General", css_class="title-4", xalign=0))
 
         # General Settings List
         list_box = Gtk.ListBox()
@@ -77,10 +75,7 @@ class SettingsWindow(Gtk.Window):
         content_box.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
 
         # Logging Section
-        log_header = Gtk.Label(label="Logging")
-        log_header.add_css_class("title-4")
-        log_header.set_xalign(0)
-        content_box.append(log_header)
+        content_box.append(self.create_label("Logging", css_class="title-4", xalign=0))
 
         log_list = Gtk.ListBox()
         log_list.set_selection_mode(Gtk.SelectionMode.NONE)
@@ -108,14 +103,9 @@ class SettingsWindow(Gtk.Window):
 
         # Timeslots Section
         ts_header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        ts_label = Gtk.Label(label="Timeslots")
-        ts_label.add_css_class("title-4")
-        ts_label.set_xalign(0)
-        ts_header.append(ts_label)
+        ts_header.append(self.create_label("Timeslots", css_class="title-4", xalign=0))
         
-        add_ts_btn = Gtk.Button(label="Add Slot")
-        add_ts_btn.connect("clicked", lambda _: self._add_timeslot_ui())
-        ts_header.append(add_ts_btn)
+        ts_header.append(self.create_button("Add Slot", callback=lambda _: self._add_timeslot_ui()))
         content_box.append(ts_header)
 
         self.timeslots_container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
@@ -128,23 +118,15 @@ class SettingsWindow(Gtk.Window):
         actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         main_box.append(actions)
 
-        reset_btn = Gtk.Button(label="Reset to Defaults")
-        reset_btn.add_css_class("destructive-action")
-        reset_btn.connect("clicked", self.on_reset_clicked)
-        actions.append(reset_btn)
+        actions.append(self.create_button("Reset to Defaults", css_class="destructive-action", callback=self.on_reset_clicked))
 
         spacer = Gtk.Box()
         spacer.set_hexpand(True)
         actions.append(spacer)
 
-        cancel_btn = Gtk.Button(label="Cancel")
-        cancel_btn.connect("clicked", lambda _: self.close())
-        actions.append(cancel_btn)
+        actions.append(self.create_button("Cancel", callback=lambda _: self.close()))
 
-        save_btn = Gtk.Button(label="Save & Apply")
-        save_btn.add_css_class("suggested-action")
-        save_btn.connect("clicked", self.on_save_clicked)
-        actions.append(save_btn)
+        actions.append(self.create_button("Save & Apply", css_class="suggested-action", callback=self.on_save_clicked))
 
     def _add_entry_row(self, listbox, label, value, tooltip=None):
         entry = Gtk.Entry()
@@ -156,23 +138,8 @@ class SettingsWindow(Gtk.Window):
         return entry
 
     def _add_widget_row(self, listbox, label_text, widget, tooltip=None):
-        row = Gtk.ListBoxRow()
-        hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=20)
-        hbox.set_margin_top(8)
-        hbox.set_margin_bottom(8)
-        hbox.set_margin_start(12)
-        hbox.set_margin_end(12)
-
-        if tooltip:
-            row.set_tooltip_text(tooltip)
-        
-        label = Gtk.Label(label=label_text, xalign=0)
-        hbox.append(label)
-        
-        widget.set_halign(Gtk.Align.END)
-        hbox.append(widget)
-        
-        row.set_child(hbox)
+        """Helper to add a standard widget row to a ListBox."""
+        row = self.create_list_row(label_text, widget, tooltip)
         listbox.append(row)
 
     def _create_path_input(self, value, append=False, tooltip=None):
@@ -197,8 +164,8 @@ class SettingsWindow(Gtk.Window):
     def _add_path_row(self, listbox, label, value, tooltip=None):
         """Helper to create a ListBox row with an Entry and a Browse button."""
         hbox, entry = self._create_path_input(value, tooltip=tooltip)
-        self._add_widget_row(listbox, label, hbox)
-        hbox.set_halign(Gtk.Align.FILL)
+        row = self.create_list_row(label, hbox, tooltip=tooltip, widget_halign=Gtk.Align.FILL)
+        listbox.append(row)
         return entry
 
     def _on_browse_folder(self, _btn, entry, append=False):
