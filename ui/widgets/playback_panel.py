@@ -3,8 +3,9 @@
 from gi.repository import Gtk, GLib, Pango
 from domain.track import Track
 from ui.player_controller import PlayerController
+from ui.ui_helpers import UIHelpersMixin
 
-class PlaybackPanel(Gtk.Box):
+class PlaybackPanel(Gtk.Box, UIHelpersMixin):
     def __init__(self, app_controller: PlayerController, main_window):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         self.app = app_controller
