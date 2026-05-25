@@ -1,6 +1,5 @@
-# ui/widgets/queue_panel.py
-
 from gi.repository import Gtk, GLib
+
 from domain.track import Track
 from ui.player_controller import PlayerController
 

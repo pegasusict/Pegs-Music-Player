@@ -1,9 +1,12 @@
 from collections import deque
 import threading
+from datetime import datetime, timedelta
 
 from domain.track import Track
 from infrastructure.database import Database
 from repository.music_repository import MusicRepository
+from scheduler.selection_engine import SelectionEngine
+import config
 
 
 class QueueManager:
@@ -11,10 +14,12 @@ class QueueManager:
     _manual_queue: deque[Track]
     _auto_queue: deque[Track]
 
-    def __init__(self):
+    def __init__(self, selection_engine: SelectionEngine) -> None:
         self._lock = threading.Lock()
         self._manual_queue = deque()
         self._auto_queue = deque()
+        self.selection_engine = selection_engine
+        self._autoqueue_target_size = config.AUTOQUEUE_PREPOPULATE_COUNT
 
     # -------------------------------------------------------------
     # Enqueue
@@ -59,13 +64,36 @@ class QueueManager:
             if self._manual_queue:
                 return self._manual_queue.popleft()
 
+            # If autoqueue is low, try to repopulate before getting a track
+            if len(self._auto_queue) < self._autoqueue_target_size:
+                self._repopulate_autoqueue()
+
             if self._auto_queue:
                 return self._auto_queue.popleft()
 
             return None
 
     # -------------------------------------------------------------
-    # Optional helpers (useful later)
+    # Autoqueue Management
+    # -------------------------------------------------------------
+
+    def _repopulate_autoqueue(self) -> None:
+        """Fills the autoqueue up to the target size by selecting tracks for future slots."""
+        tracks_to_fetch = self._autoqueue_target_size - len(self._auto_queue)
+        if tracks_to_fetch <= 0:
+            return
+
+        # Calculate predicted start time based on existing auto-queue
+        prediction_start = datetime.now()
+        for queued_track in self._auto_queue:
+            duration = queued_track.duration_seconds if queued_track.duration_seconds > 0 else config.AVERAGE_TRACK_DURATION_SECONDS
+            prediction_start += timedelta(seconds=duration)
+
+        new_tracks = self.selection_engine.select_tracks_for_future_slots(tracks_to_fetch, prediction_start)
+        
+        for track in new_tracks:
+            self._auto_queue.append(track)
+
     # -------------------------------------------------------------
 
     def clear_manual(self) -> None:
@@ -212,3 +240,8 @@ class QueueManager:
                         self._manual_queue.append(track)
                     else:
                         self._auto_queue.append(track)
+
+    def initial_populate_autoqueue(self) -> None:
+        """Called once at startup to fill the autoqueue."""
+        with self._lock:
+            self._repopulate_autoqueue()

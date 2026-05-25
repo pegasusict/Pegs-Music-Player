@@ -7,6 +7,7 @@ from persistence.history_repository import PlayHistoryRepository
 
 
 class SqlitePlayHistoryRepository(PlayHistoryRepository):
+    """SQLite implementation of the PlayHistoryRepository."""
     def __init__(self, database: Database):
         self.db = database
 

@@ -1,5 +1,3 @@
-# infrastructure/queries/spread_queries.py
-
 INSERT_OR_REPLACE = """
     INSERT OR REPLACE INTO spread_state
     (category, period_id, period_target, played_count, accumulator, updated_at)

@@ -8,6 +8,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True, slots=True)
 class Migration:
+    """Represents a database schema migration."""
     revision: str
     description: str
     upgrade: Callable[[sqlite3.Connection], None]
@@ -50,6 +51,7 @@ def _ensure_migration_table(connection: sqlite3.Connection) -> None:
 
 
 def _applied_revisions(connection: sqlite3.Connection) -> set[str]:
+    """Fetch the set of applied migration revisions from the database."""
     rows = connection.execute("SELECT revision FROM schema_migrations").fetchall()
     return {row["revision"] for row in rows}
 
@@ -59,6 +61,7 @@ def _column_exists(
     table: str,
     column: str,
 ) -> bool:
+    """Check if a column exists in a table."""
     rows = connection.execute(f"PRAGMA table_info({table})").fetchall()
     return any(row["name"] == column for row in rows)
 
@@ -69,11 +72,13 @@ def _add_column_if_missing(
     column: str,
     definition: str,
 ) -> None:
+    """Add a column to a table if it does not already exist."""
     if not _column_exists(connection, table, column):
         connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
 
 def _initial_schema(connection: sqlite3.Connection) -> None:
+    """Create the initial database schema for the music player."""
     connection.executescript(
         """
         CREATE TABLE IF NOT EXISTS tracks (
@@ -159,6 +164,7 @@ def _initial_schema(connection: sqlite3.Connection) -> None:
 
 
 def _add_replaygain_columns(connection: sqlite3.Connection) -> None:
+    """Add cached per-track ReplayGain fields to the tracks table."""
     _add_column_if_missing(
         connection,
         "tracks",

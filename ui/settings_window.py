@@ -71,6 +71,56 @@ class SettingsWindow(Gtk.Window, UIHelpersMixin):
             list_box, "Avg Duration (sec)", self.duration_spin,
             tooltip="Fallback duration used for queue planning when a file's actual duration cannot be read from metadata.")
 
+        # Playback Section
+        content_box.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
+        content_box.append(self.create_label("Playback", css_class="title-4", xalign=0))
+        
+        playback_list = Gtk.ListBox()
+        playback_list.set_selection_mode(Gtk.SelectionMode.NONE)
+        playback_list.add_css_class("boxed-list")
+        content_box.append(playback_list)
+
+        self.crossfade_spin = Gtk.SpinButton.new_with_range(0, 10, 0.1)
+        self.crossfade_spin.set_value(float(self.config.get("crossfade_seconds", 3.5)))
+        self._add_widget_row(playback_list, "Crossfade (sec)", self.crossfade_spin,
+                            tooltip="Duration of crossfade between consecutive tracks.")
+
+        self.ui_fade_spin = Gtk.SpinButton.new_with_range(0, 5, 0.05)
+        self.ui_fade_spin.set_value(float(self.config.get("ui_fade_seconds", 0.25)))
+        self._add_widget_row(playback_list, "UI Fade (sec)", self.ui_fade_spin,
+                            tooltip="Duration of fades when pausing, stopping, or resuming.")
+
+        # Compressor Section
+        content_box.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
+        content_box.append(self.create_label("Dynamic Compression (SC4)", css_class="title-4", xalign=0))
+        
+        comp_list = Gtk.ListBox()
+        comp_list.set_selection_mode(Gtk.SelectionMode.NONE)
+        comp_list.add_css_class("boxed-list")
+        content_box.append(comp_list)
+
+        comp_cfg = self.config.get("compressor", {})
+        
+        self.comp_threshold_spin = Gtk.SpinButton.new_with_range(-60, 0, 1)
+        self.comp_threshold_spin.set_value(float(comp_cfg.get("threshold_level", -20.0)))
+        self._add_widget_row(comp_list, "Threshold (dB)", self.comp_threshold_spin, tooltip="Level at which compression starts.")
+
+        self.comp_ratio_spin = Gtk.SpinButton.new_with_range(1, 20, 0.5)
+        self.comp_ratio_spin.set_value(float(comp_cfg.get("ratio", 4.0)))
+        self._add_widget_row(comp_list, "Ratio (n:1)", self.comp_ratio_spin, tooltip="Amount of compression applied above threshold.")
+
+        self.comp_attack_spin = Gtk.SpinButton.new_with_range(0.1, 100, 0.5)
+        self.comp_attack_spin.set_value(float(comp_cfg.get("attack_time", 1.5)))
+        self._add_widget_row(comp_list, "Attack (ms)", self.comp_attack_spin, tooltip="How fast the compressor reacts.")
+
+        self.comp_release_spin = Gtk.SpinButton.new_with_range(1, 500, 5)
+        self.comp_release_spin.set_value(float(comp_cfg.get("release_time", 32.5)))
+        self._add_widget_row(comp_list, "Release (ms)", self.comp_release_spin, tooltip="How fast the compressor recovers.")
+
+        self.comp_gain_spin = Gtk.SpinButton.new_with_range(0, 24, 1)
+        self.comp_gain_spin.set_value(float(comp_cfg.get("makeup_gain", 0.0)))
+        self._add_widget_row(comp_list, "Makeup Gain (dB)", self.comp_gain_spin, tooltip="Boost the signal after compression.")
+
         # Separator
         content_box.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
 
@@ -283,6 +333,17 @@ class SettingsWindow(Gtk.Window, UIHelpersMixin):
         self.config["db_path"] = self.db_path_entry.get_text()
         self.config["daily_folder"] = self.daily_folder_entry.get_text()
         self.config["average_track_duration_seconds"] = int(self.duration_spin.get_value())
+        self.config["crossfade_seconds"] = float(self.crossfade_spin.get_value())
+        self.config["ui_fade_seconds"] = float(self.ui_fade_spin.get_value())
+        self.config["compressor"] = {
+            "rms_peak": 0.0, # Kept at 0.0 default
+            "attack_time": float(self.comp_attack_spin.get_value()),
+            "release_time": float(self.comp_release_spin.get_value()),
+            "threshold_level": float(self.comp_threshold_spin.get_value()),
+            "ratio": float(self.comp_ratio_spin.get_value()),
+            "knee_radius": 2.0, # Kept at 2.0 default
+            "makeup_gain": float(self.comp_gain_spin.get_value()),
+        }
         self.config["logging"] = {
             "level": self.log_level_combo.get_active_text(),
             "file": self.log_file_entry.get_text()
@@ -346,6 +407,15 @@ class SettingsWindow(Gtk.Window, UIHelpersMixin):
         self.db_path_entry.set_text(str(defaults.get("db_path", "")))
         self.daily_folder_entry.set_text(str(defaults.get("daily_folder", "")))
         self.duration_spin.set_value(float(defaults.get("average_track_duration_seconds", 210)))
+        self.crossfade_spin.set_value(float(defaults.get("crossfade_seconds", 3.5)))
+        self.ui_fade_spin.set_value(float(defaults.get("ui_fade_seconds", 0.25)))
+
+        comp_defaults = defaults.get("compressor", {})
+        self.comp_threshold_spin.set_value(float(comp_defaults.get("threshold_level", -20.0)))
+        self.comp_ratio_spin.set_value(float(comp_defaults.get("ratio", 4.0)))
+        self.comp_attack_spin.set_value(float(comp_defaults.get("attack_time", 1.5)))
+        self.comp_release_spin.set_value(float(comp_defaults.get("release_time", 32.5)))
+        self.comp_gain_spin.set_value(float(comp_defaults.get("makeup_gain", 0.0)))
 
         # Update logging
         log_cfg = defaults.get("logging", {})

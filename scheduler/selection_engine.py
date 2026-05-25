@@ -1,5 +1,6 @@
-from datetime import date
-from typing import Optional
+import config
+from datetime import date, datetime, timedelta
+from typing import Optional, List
 
 from domain.track import Track
 from infrastructure.spread_state_repository import SpreadStateRepository
@@ -83,6 +84,52 @@ class SelectionEngine:
             self._update_last_artist(self.selected_track)
 
         return self.selected_track
+
+    def select_tracks_for_future_slots(self, count: int, start_time: datetime) -> List[Track]:
+        """
+        Selects multiple tracks for the future, calculating the active slot 
+        for each track's predicted start time.
+        """
+        future_tracks = []
+        current_prediction_time = start_time
+        # Use a local variable to maintain artist separation during the look-ahead
+        lookahead_last_artist = self.last_artist
+
+        for _ in range(count):
+            slot = self.scheduler.detect_slot(at_time=current_prediction_time)
+            track = None
+
+            if slot:
+                # 1. Try Slot Specials
+                if self.music_repo.count_slot_special(slot) > 0 and self.slot_spread.should_trigger():
+                    track = self.music_repo.get_slot_special(slot, lookahead_last_artist)
+                    if track:
+                        self.slot_spread.notify_played()
+
+                # 2. Try Daily Specials
+                if not track and self.music_repo.count_daily_special() > 0 and self.daily_spread.should_trigger():
+                    track = self.music_repo.get_daily_special(lookahead_last_artist)
+                    if track:
+                        self.daily_spread.notify_played()
+
+                # 3. Regular Track
+                if not track:
+                    folders = slot.folders
+                    track = self.music_repo.get_regular(folders, lookahead_last_artist, shuffle=self._shuffle_enabled)
+
+            if track:
+                future_tracks.append(track)
+                lookahead_last_artist = track.artist
+                # Advance the clock for the next prediction
+                duration = track.duration_seconds if track.duration_seconds > 0 else config.AVERAGE_TRACK_DURATION_SECONDS
+                current_prediction_time += timedelta(seconds=duration)
+            else:
+                # If we can't find a track, stop filling to avoid infinite loops or bad data
+                break
+        
+        if future_tracks:
+            self.last_artist = lookahead_last_artist
+        return future_tracks
 
     # ----------------------------
 

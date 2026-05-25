@@ -1,12 +1,12 @@
 # ui/widgets/playback_panel.py
 
-from gi.repository import Gtk, GLib, Pango
+from gi.repository import Gtk, GLib, Pango, Gdk
 from domain.track import Track
 from ui.player_controller import PlayerController
 from ui.ui_helpers import UIHelpersMixin
 
 class PlaybackPanel(Gtk.Box, UIHelpersMixin):
-    def __init__(self, app_controller: PlayerController, main_window):
+    def __init__(self, app_controller: PlayerController, main_window: Gtk.Window) -> None:
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         self.app = app_controller
         self.main_window = main_window # Reference to the main window for shared methods
@@ -23,56 +23,77 @@ class PlaybackPanel(Gtk.Box, UIHelpersMixin):
         self.playback_controls.set_homogeneous(True)
         self.append(self.playback_controls)
 
-        self.play_button = Gtk.Button(label="▶")
-        self.play_button.connect("clicked", lambda _: self.app.play_or_resume())
-        self.playback_controls.append(self.play_button)
-
-        self.pause_button = Gtk.Button(label="⏸")
-        self.pause_button.connect("clicked", lambda _: self.on_pause_resume())
-        self.playback_controls.append(self.pause_button)
-
-        self.stop_button = Gtk.Button(label="⏹")
-        self.stop_button.connect("clicked", lambda _: self.app.stop())
-        self.playback_controls.append(self.stop_button)
-
-        self.next_button = Gtk.Button(label="⏭")
-        self.next_button.connect("clicked", lambda _: self.on_next())
-        self.playback_controls.append(self.next_button)
-
-        # self.progress = Gtk.ProgressBar()
-        # self.append(self.progress)
-
-        self.time_label = Gtk.Label(label="0:00 / 0:00")
-        self.append(self.time_label)
-
         self.error_label = Gtk.Label(label="", ellipsize=Pango.EllipsizeMode.END, max_width_chars=50)
         self.error_label.set_wrap(True)
         self.append(self.error_label)
 
-        self.seek = Gtk.Scale.new_with_range(
-            Gtk.Orientation.HORIZONTAL,
-            0,
-            1,
-            1
-        )
+        self.seek = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL,0,1,1)
         self.seek.set_draw_value(False)
         self.append(self.seek)
         self.seek.connect("value-changed", self.on_seek)
 
+        self.time_label = Gtk.Label(label="0:00 / 0:00")
+        self.append(self.time_label)
+
         self.volume_label = self.create_label("Volume")
         self.append(self.volume_label)
 
-        self.volume = Gtk.Scale.new_with_range(
-            Gtk.Orientation.HORIZONTAL,
-            0,
-            100,
-            1
-        )
+        self.volume = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL,0,100,1)
         initial_volume_percent = round(self.app.get_volume() * 100)
         self.volume.set_value(max(0, min(100, initial_volume_percent)))
         self.volume.connect("value-changed", self.on_volume_changed)
         self.append(self.volume)
         
+        # VU Meter
+        self.vu_meter_label = self.create_label("VU Meter")
+        self.append(self.vu_meter_label)
+
+        self.vu_meter_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        self.append(self.vu_meter_box)
+
+        self.vu_meter_left = Gtk.ProgressBar()
+        self.vu_meter_left.set_fraction(0.0)
+        self.vu_meter_left.add_css_class("vu-meter")
+        self.vu_meter_left.set_hexpand(True)
+        self.vu_meter_box.append(self.vu_meter_left)
+
+        self.vu_meter_right = Gtk.ProgressBar()
+        self.vu_meter_right.set_fraction(0.0)
+        self.vu_meter_right.add_css_class("vu-meter")
+        self.vu_meter_right.set_hexpand(True)
+        self.vu_meter_box.append(self.vu_meter_right)
+
+        # Apply custom styling for the gradient
+        self._setup_vu_meter_style()
+
+        self.play_button = self.create_button(
+            icon_name="media-playback-start",
+            tooltip="Play or Resume",
+            callback=self.play_or_resume
+        )
+        self.playback_controls.append(self.play_button)
+
+        self.pause_button = self.create_button(
+            icon_name="media-playback-pause",
+            tooltip="Pause or Resume",
+            callback=self.on_pause_resume
+        )
+        self.playback_controls.append(self.pause_button)
+
+        self.stop_button = self.create_button(
+            icon_name="media-playback-stop",
+            tooltip="Stop",
+            callback=self.stop
+        )
+        self.playback_controls.append(self.stop_button)
+
+        self.next_button = self.create_button(
+            icon_name="media-playback-next",
+            tooltip="Next",
+            callback=self.on_next
+        )
+        self.playback_controls.append(self.next_button)
+
         # Shuffle button
         self.shuffle_button = self.create_button(
             icon_name="media-playlist-shuffle", 
@@ -88,6 +109,30 @@ class PlaybackPanel(Gtk.Box, UIHelpersMixin):
             callback=self.on_stop_at_end_button_clicked
         )
         self.playback_controls.append(self.stop_at_end_button)
+
+        # Connect VU meter callback
+        self.app.set_vu_meter_ui_callback(self._on_vu_meter_update)
+
+    def _setup_vu_meter_style(self):
+        """Applies a linear gradient to the VU meter progress nodes."""
+        css_provider = Gtk.CssProvider()
+        css_data = """
+        .vu-meter progress {
+            background-image: linear-gradient(to right, #2ecc71 0%, #2ecc71 70%, #f1c40f 85%, #e74c3c 100%);
+            border-radius: 2px;
+        }
+        .vu-meter trough {
+            min-height: 10px;
+            background-color: rgba(255, 255, 255, 0.05);
+            border-radius: 2px;
+        }
+        """
+        css_provider.load_from_data(css_data.encode())
+        Gtk.StyleContext.add_provider_for_display(
+            Gdk.Display.get_default(),
+            css_provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
 
     # ---------------------------------------------------------
     # Playback actions
@@ -124,6 +169,14 @@ class PlaybackPanel(Gtk.Box, UIHelpersMixin):
         """Change the playback volume."""
         self.app.set_volume(scale.get_value() / 100)
 
+    def _on_vu_meter_update(self, peak_levels: list[float], rms_levels: list[float]):
+        """Callback to update the VU meter UI."""
+        if len(peak_levels) >= 2:
+            self.vu_meter_left.set_fraction(peak_levels[0])
+            self.vu_meter_right.set_fraction(peak_levels[1])
+        elif len(peak_levels) == 1: # Mono case
+            self.vu_meter_left.set_fraction(peak_levels[0])
+            self.vu_meter_right.set_fraction(peak_levels[0])
     def on_shuffle_button_clicked(self, button):
         """Toggle shuffle mode on or off."""
         self.app.set_shuffle_enabled(not self.app.get_shuffle_enabled())

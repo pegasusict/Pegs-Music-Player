@@ -1,13 +1,14 @@
 from datetime import datetime, timezone
 import sqlite3
 import threading
-from typing import Optional, Iterable
+from typing import Optional
 
 from infrastructure.migrations import run_migrations
 
 
 class Database:
-    def __init__(self, path: str):
+    """A thread-safe database connection manager for SQLite."""
+    def __init__(self, path: str) -> None:
         self.path = path
         self._conn = None
         self._lock = threading.RLock()
@@ -61,6 +62,7 @@ class Database:
     # --------------------------------------------------
 
     def _run_migrations(self) -> None:
+        """Runs database schema migrations to ensure the database is up-to-date."""
         with self.connect() as connection:
             run_migrations(connection)
 
@@ -69,6 +71,10 @@ class Database:
     # --------------------------------------------------
 
     def save_playback_state(self, track_id: int | None, position: int) -> None:
+        """
+        Saves the current playback state, including the track ID and position. 
+        If track_id is None, it clears the playback state.
+        """
         with self._lock:
             connection = self.connect()
             with connection:
@@ -83,6 +89,7 @@ class Database:
                     )
 
     def load_playback_state(self):
+        """Loads the current playback state, returning a tuple of (track_id, position) or None if no state is saved."""
         with self._lock:
             connection = self.connect()
             return connection.execute(
@@ -94,6 +101,7 @@ class Database:
     # --------------------------------------------------
 
     def save_app_state(self, key: str, value: str) -> None:
+        """Saves a key-value pair in the app_state table, allowing for flexible storage of various application states."""
         with self._lock:
             connection = self.connect()
             with connection:
@@ -102,7 +110,8 @@ class Database:
                     (key, value),
                 )
 
-    def load_app_state(self, key: str):
+    def load_app_state(self, key: str) -> Optional[str]:
+        """Loads a value from the app_state table based on the provided key, returning None if the key does not exist."""
         with self._lock:
             connection = self.connect()
             row = connection.execute(
@@ -116,6 +125,7 @@ class Database:
     # --------------------------------------------------
 
     def mark_played(self, track_id: int) -> None:
+        """Marks a track as played by inserting a record into the play_history table with the current timestamp."""
         with self._lock:
             connection = self.connect()
             with connection:
@@ -125,6 +135,10 @@ class Database:
                 )
 
     def get_last_played_artist(self) -> Optional[str]:
+        """
+        Retrieves the artist of the most recently played track by joining the play_history and tracks tables,
+          returning None if no tracks have been played.
+        """
         with self._lock:
             connection = self.connect()
             row = connection.execute("""
@@ -141,6 +155,7 @@ class Database:
     # --------------------------------------------------
 
     def mark_cycle_played(self, folder: str, track_id: int) -> None:
+        """Marks a track as played in the cycle for a specific folder by inserting a record into the cycle_state table."""
         with self._lock:
             connection = self.connect()
             with connection:
@@ -150,6 +165,7 @@ class Database:
                 )
 
     def reset_cycle(self, folder: str) -> None:
+        """Resets the cycle for a specific folder by deleting all records from the cycle_state table."""
         with self._lock:
             connection = self.connect()
             with connection:
@@ -162,7 +178,11 @@ class Database:
         self,
         folder: str,
         exclude_artist: str | None,
-    ):
+    ) -> list[tuple]:
+        """
+        Retrieves a list of unplayed tracks for a specific folder, optionally excluding tracks by a specified artist,
+          by performing a LEFT JOIN between the tracks and cycle_state tables.
+        """
         with self._lock:
             connection = self.connect()
             query = """

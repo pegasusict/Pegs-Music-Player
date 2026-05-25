@@ -47,7 +47,6 @@ class Application:
         logger.debug("Initializing repositories...")
         # Core Infrastructure
         self.music_repo = MusicRepository(database)
-        self.queue_manager = QueueManager()
         
         # Scheduler
         logger.debug("Building timeslots...")
@@ -87,6 +86,9 @@ class Application:
             slot_spread=self.slot_spread,
             calculator=self.period_calculator
         )
+        self.queue_manager = QueueManager(
+            selection_engine=self.selection_engine
+        )
         # Load and apply shuffle state immediately after selection_engine is created
         initial_shuffle_state = self.load_shuffle_state()
         self.selection_engine.set_shuffle_enabled(initial_shuffle_state)
@@ -98,6 +100,8 @@ class Application:
         saved_volume = self.load_volume()
         logger.debug(f"load_volume() returned {saved_volume}. Applying to engine...")
         self.playback_engine.set_volume(saved_volume)
+        self.playback_engine.set_crossfade_duration(config.CROSSFADE_SECONDS)
+        self.playback_engine.set_ui_fade_duration(config.UI_FADE_SECONDS)
         logger.debug("Finalizing bootstrap initialization.")
 
         self._running = False
@@ -153,6 +157,9 @@ class Application:
 
             # Start runtime loop
             self.slot_runtime.start()
+
+            # Initial autoqueue population
+            self.queue_manager.initial_populate_autoqueue()
 
             # Notify UI that initial setup is complete
             GLib.idle_add(self._post_initial_setup_ui_update)
@@ -416,6 +423,7 @@ class Application:
         from infrastructure.logging_setup import init_logging
         init_logging(config.LOG_LEVEL, config.LOG_FILE)
 
+        self.playback_engine.update_audio_filters()
         self._rebuild_scheduler_and_notify_slot_runtime(updated_raw_config)
 
     def _rebuild_scheduler_and_notify_slot_runtime(self, raw_config: dict):
@@ -428,6 +436,8 @@ class Application:
         self.selection_engine.scheduler = self.scheduler
         self.slot_runtime.scheduler = self.scheduler
         self.slot_runtime.base_folder = config.BASE_FOLDER
+        self.playback_engine.set_crossfade_duration(config.CROSSFADE_SECONDS)
+        self.playback_engine.set_ui_fade_duration(config.UI_FADE_SECONDS)
         self.filewatcher.set_supported_extensions(config.SUPPORTED_EXTENSIONS)
         self.slot_runtime.trigger_reconfiguration()
         logger.info("Timeslot scheduler rebuilt and SlotRuntime notified.")

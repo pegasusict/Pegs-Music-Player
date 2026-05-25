@@ -21,6 +21,10 @@ DAILY_FOLDER: str
 TIMESLOTS: list[dict[str, Any]]
 LOG_LEVEL: str
 LOG_FILE: str
+CROSSFADE_SECONDS: float
+UI_FADE_SECONDS: float
+AUTOQUEUE_PREPOPULATE_COUNT: int
+COMPRESSOR_SETTINGS: Dict[str, float]
 
 # Define the full default configuration schema
 DEFAULT_CONFIG_SCHEMA: Dict[str, Any] = {
@@ -28,7 +32,19 @@ DEFAULT_CONFIG_SCHEMA: Dict[str, Any] = {
     "db_path": "~/.music_player.db", # Default database path
     "base_folder": "INSERT_YOUR_MUSIC_FOLDER_PATH_HERE", # Placeholder for user's music folder
     "average_track_duration_seconds": 210,
+    "crossfade_seconds": 3.5,
+    "ui_fade_seconds": 0.25,
+    "autoqueue_prepopulate_count": 5,
     "supported_extensions": [".mp3", ".flac", ".ogg", ".m4a", ".wav", ".aac", ".mp2"], # Supported audio file extensions
+    "compressor": {
+        "rms_peak": 0.0,
+        "attack_time": 1.5,
+        "release_time": 32.5,
+        "threshold_level": -20.0,
+        "ratio": 4.0,
+        "knee_radius": 2.0,
+        "makeup_gain": 0.0,
+    },
     "daily_folder": "NOT_IN_USE", # Folder for daily special tracks (e.g., daily jingles)
     "logging": {
         "level": "INFO",
@@ -156,7 +172,7 @@ def load_config() -> dict[str, Any]:
 
 def _update_module_globals(cfg: Dict[str, Any]):
     """Updates the module-level global variables with values from the provided config."""
-    global DB_PATH, BASE_FOLDER, SUPPORTED_EXTENSIONS, AVERAGE_TRACK_DURATION_SECONDS, DAILY_FOLDER, TIMESLOTS, LOG_LEVEL, LOG_FILE
+    global DB_PATH, BASE_FOLDER, SUPPORTED_EXTENSIONS, AVERAGE_TRACK_DURATION_SECONDS, DAILY_FOLDER, TIMESLOTS, LOG_LEVEL, LOG_FILE, CROSSFADE_SECONDS, UI_FADE_SECONDS, COMPRESSOR_SETTINGS, AUTOQUEUE_PREPOPULATE_COUNT
     
     DB_PATH = str(Path(cfg["db_path"]).expanduser())
     BASE_FOLDER = Path(cfg["base_folder"]).expanduser()
@@ -165,6 +181,21 @@ def _update_module_globals(cfg: Dict[str, Any]):
     DAILY_FOLDER = str(cfg["daily_folder"])
     LOG_LEVEL = cfg.get("logging", {}).get("level", "INFO")
     LOG_FILE = cfg.get("logging", {}).get("file", "~/.cache/pegasus-player/pegasus_player.log")
+    CROSSFADE_SECONDS = float(cfg.get("crossfade_seconds", 3.5))
+    UI_FADE_SECONDS = float(cfg.get("ui_fade_seconds", 0.25))
+    AUTOQUEUE_PREPOPULATE_COUNT = int(cfg.get("autoqueue_prepopulate_count", 5))
+
+    # Map config (underscores) to GStreamer LADSPA properties (hyphens)
+    comp = cfg.get("compressor", DEFAULT_CONFIG_SCHEMA["compressor"])
+    COMPRESSOR_SETTINGS = {
+        "rms-peak": float(comp.get("rms_peak", 0.0)),
+        "attack-time": float(comp.get("attack_time", 1.5)),
+        "release-time": float(comp.get("release_time", 32.5)),
+        "threshold-level": float(comp.get("threshold_level", -20.0)),
+        "ratio": float(comp.get("ratio", 4.0)),
+        "knee-radius": float(comp.get("knee_radius", 2.0)),
+        "makeup-gain": float(comp.get("makeup_gain", 0.0)),
+    }
 
     # Parse timeslots into a format compatible with the domain model
     TIMESLOTS = []

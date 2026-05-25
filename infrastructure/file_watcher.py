@@ -1,5 +1,3 @@
-# filewatcher.py
-
 from __future__ import annotations
 
 import logging
@@ -33,7 +31,7 @@ class FileWatcher:
         supported_extensions: set[str],
         on_new_track: Callable[[Path], None],
         write_stability_delay: float = 1.5,
-    ):
+    ) -> None:
         self._folders = [Path(f).expanduser().resolve() for f in folders]
         self._extensions = {ext.lower() for ext in supported_extensions}
         self._on_new_track = on_new_track
@@ -48,6 +46,7 @@ class FileWatcher:
     # ------------------------------------------------------------------
 
     def start(self) -> None:
+        """Starts the file watcher, initializing the observer and event handlers."""
         with self._lock:
             if self._running:
                 return
@@ -66,6 +65,7 @@ class FileWatcher:
             self._running = True
 
     def stop(self) -> None:
+        """Stops the file watcher, stopping the observer."""
         observer = None
         with self._lock:
             if not self._running or not self._observer:
@@ -101,6 +101,7 @@ class FileWatcher:
     # ------------------------------------------------------------------
 
     def _handle_path(self, path: Path) -> None:
+        """Handles a new file path, checking if it is a valid audio file and stable before invoking the callback."""
         if not path.is_file():
             return
 
@@ -150,14 +151,16 @@ class FileWatcher:
 
 
 class _EventHandler(FileSystemEventHandler):
-    def __init__(self, watcher: FileWatcher):
+    """Internal event handler for watchdog that delegates to the FileWatcher."""
+    def __init__(self, watcher: FileWatcher) -> None:
         self._watcher = watcher
 
-    def on_created(self, event):
+    def on_created(self, event) -> None:
+        """Handle newly created files in the watched folders."""
         if isinstance(event, FileCreatedEvent):
             self._watcher._handle_path(Path(event.src_path))
 
-    def on_moved(self, event):
-        # Handle files moved into the watched folder
+    def on_moved(self, event) -> None:
+        """Handle files moved into the watched folders (e.g. completed downloads)."""
         if isinstance(event, FileMovedEvent):
             self._watcher._handle_path(Path(event.dest_path))

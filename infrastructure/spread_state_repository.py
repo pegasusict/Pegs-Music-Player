@@ -5,6 +5,7 @@ from infrastructure.queries import spread_queries as queries
 
 
 class SpreadStateRepository:
+    """Repository for managing the spread state of categories."""
     def __init__(self, database: Database):
         self._db = database
 
@@ -16,6 +17,7 @@ class SpreadStateRepository:
         played: int,
         accumulator: float,
     ) -> None:
+        """Saves the spread state for a given category."""
         with self._db.connect() as con:
             con.execute(
                 queries.INSERT_OR_REPLACE,
@@ -30,6 +32,7 @@ class SpreadStateRepository:
             )
 
     def load(self, category: str) -> dict[str, int | float] | None:
+        """Loads the spread state for a given category."""
         with self._db.connect() as con:
             row = con.execute(
                 queries.SELECT_BY_CATEGORY,
@@ -47,6 +50,7 @@ class SpreadStateRepository:
         }
 
     def clear(self, category: str) -> None:
+        """Clears the spread state for a given category."""
         with self._db.connect() as con:
             con.execute(
                 queries.DELETE_BY_CATEGORY,

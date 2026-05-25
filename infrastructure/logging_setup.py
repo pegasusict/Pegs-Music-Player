@@ -5,7 +5,7 @@ import sys
 LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
-def init_logging(level: str | int = logging.INFO, log_file: str = "pegasus_player.log"):
+def init_logging(level: str | int = logging.INFO, log_file: str = "pegasus_music_player.log"):
     """
     Initializes the centralized logging system for the entire application.
     Sets up a console handler and an optional file handler.
@@ -34,7 +34,7 @@ def init_logging(level: str | int = logging.INFO, log_file: str = "pegasus_playe
             # Expand ~ and handle absolute paths. If relative, use the default cache dir.
             log_path = Path(log_file).expanduser()
             if not log_path.is_absolute():
-                log_path = Path("~/.cache/pegasus-player/").expanduser() / log_path
+                log_path = Path("~/.cache/pegasus-music-player/").expanduser() / log_path
             
             log_path.parent.mkdir(parents=True, exist_ok=True)
             

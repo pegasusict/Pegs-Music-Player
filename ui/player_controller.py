@@ -1,4 +1,5 @@
 # ui/player_controller.py
+from typing import Callable
 
 from gi.repository import GLib
 
@@ -12,6 +13,7 @@ class PlayerController:
 
         self.engine = app.playback_engine  # IMPORTANT: injected engine
         self.engine.set_on_track_end(self._on_track_end)
+        self.engine.set_vu_meter_callback(self._on_vu_meter_update) # New: Connect VU meter callback
         self.engine.set_on_error(self._on_playback_error)
 
         self.current_track = None
@@ -20,6 +22,7 @@ class PlayerController:
         self.main_window = None # Will be set by the application
         self._consecutive_errors = 0
         self._refresh_timer_id = 0
+        self._vu_meter_ui_callback = None # New: Callback for UI to receive VU meter updates
 
         # Add periodic logging for average track duration
         GLib.timeout_add_seconds(3600, self._update_average_duration_periodically) # Every hour # type: ignore
@@ -114,7 +117,7 @@ class PlayerController:
     # ----------------------------
 
     def play_next(self):
-        track = self.app.selection_engine.select_next()
+        track = self.app.queue_manager.get_next()
 
         if not track:
             return None
@@ -150,6 +153,7 @@ class PlayerController:
             self.stop()
             # Reset the "stop at end" flag after it has been triggered
             self.app.set_stop_at_end_enabled(False)
+            self.app.queue_manager.clear_auto() # Clear autoqueue when stopping at end
             if self.main_window: GLib.idle_add(self.main_window.refresh_status)
         else:
             self.play_next()
@@ -165,6 +169,14 @@ class PlayerController:
             return
 
         self.play_next()
+
+    def _on_vu_meter_update(self, peak_levels: list[float], rms_levels: list[float]):
+        """Internal callback from PlaybackEngine, forwards to UI callback."""
+        if self._vu_meter_ui_callback:
+            self._vu_meter_ui_callback(peak_levels, rms_levels)
+
+    def set_vu_meter_ui_callback(self, callback: Callable[[list[float], list[float]], None]):
+        self._vu_meter_ui_callback = callback
 
     # ----------------------------
     # UI-safe helper

@@ -14,12 +14,12 @@ class TimeslotScheduler:
         self._timeslots = timeslots
         # self._current_slot: Optional[Timeslot] = self.detect_slot() # Removed as it's unused
 
-    def detect_slot(self) -> Optional[Timeslot]:
-        """Determines which timeslot (if any) currently applies based on the current time."""
-        now = datetime.now().astimezone().time()
+    def detect_slot(self, at_time: Optional[datetime] = None) -> Optional[Timeslot]:
+        """Determines which timeslot (if any) applies based on the provided time (defaults to now)."""
+        target_time = (at_time if at_time else datetime.now()).astimezone().time()
 
         for slot in self._timeslots[-1::-1]:  # check in reverse order to prioritize later slots
-            if slot.contains(now):
+            if slot.contains(target_time):
                 return slot
 
         return None

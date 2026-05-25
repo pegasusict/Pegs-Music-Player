@@ -154,7 +154,7 @@ def get_replaygain_coverage(database: Database) -> tuple[int, int]:
     return int(row[0] or 0), int(row[1] or 0)
 
 
-def get_tracks_by_folder(database: Database, folder: str):
+def get_tracks_by_folder(database: Database, folder: str) -> list[tuple[int, str, str, str, str, int, float | None, float | None]]:
     """Retrieves all tracks in a specific folder."""
     with database.connect() as connection:
         return connection.execute(
@@ -166,7 +166,7 @@ def get_tracks_by_folder(database: Database, folder: str):
             (folder,),
         ).fetchall()
 
-def get_tracks_by_folders(database: Database, folders: Iterable[str]):
+def get_tracks_by_folders(database: Database, folders: Iterable[str]) -> list[tuple[int, str, str, str, str, int, float | None, float | None]]:
     """Retrieves all tracks in multiple folders."""
     folders = list(folders)
     if not folders:
@@ -184,7 +184,7 @@ def get_tracks_by_folders(database: Database, folders: Iterable[str]):
             folders,
         ).fetchall()
 
-def get_track_by_id(database: Database, track_id: int):
+def get_track_by_id(database: Database, track_id: int) -> tuple[int, str, str, str, str, int, float | None, float | None]:
     """Retrieves a track by its ID."""
     with database.connect() as connection:
         return connection.execute(
@@ -196,7 +196,7 @@ def get_track_by_id(database: Database, track_id: int):
             (track_id,),
         ).fetchone()
 
-def get_all_tracks(database: Database):
+def get_all_tracks(database: Database) -> list[tuple[int, str, str, str, str, int, float | None, float | None]]:
     """Retrieves all tracks from the database."""
     with database.connect() as connection:
         return connection.execute(f"""
@@ -216,7 +216,7 @@ def delete_track(database: Database, track_id: int) -> None:
         connection.execute("DELETE FROM play_history WHERE track_id = ?", (track_id,)) # type: ignore
         connection.execute("DELETE FROM tracks WHERE id = ?", (track_id,))
 
-def get_unplayed_cycle_tracks(database: Database, folder: str):
+def get_unplayed_cycle_tracks(database: Database, folder: str) -> list[tuple[int, str, str, str, str, int, float | None, float | None]]:
     """Retrieves tracks in a folder that haven't been played in the current cycle."""
     with database.connect() as connection:
         return connection.execute(
@@ -231,7 +231,7 @@ def get_unplayed_cycle_tracks(database: Database, folder: str):
             (folder, folder),
         ).fetchall()
 
-def get_recently_played_tracks(database: Database, limit: int = 50):
+def get_recently_played_tracks(database: Database, limit: int = 50) -> list[tuple[int, str, str, str, str, int, float | None, float | None]]:
     """
     Retrieves a list of recently played tracks, ordered by played_at descending.
     """
@@ -248,4 +248,3 @@ def get_recently_played_tracks(database: Database, limit: int = 50):
             """,
             (limit,),
         ).fetchall()
-    
