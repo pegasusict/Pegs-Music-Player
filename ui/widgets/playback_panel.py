@@ -42,7 +42,7 @@ class PlaybackPanel(Gtk.Box, UIHelpersMixin):
         self.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
 
         # VU Meter
-        self.vu_meter_label = self.create_label("VU Meter")
+        self.vu_meter_label = self.create_label("VU Meter / Volume")
         self.append(self.vu_meter_label)
 
         # Mixer-style side-by-side vertical VU meters with a central dB scale
