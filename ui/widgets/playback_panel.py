@@ -128,6 +128,13 @@ class PlaybackPanel(Gtk.Box, UIHelpersMixin):
         )
         self.playback_controls.append(self.next_button)
 
+        self.go_to_beginning_button = self.create_button(
+            icon_name="media-seek-backward",
+            tooltip="Go to beginning of current track",
+            callback=lambda _: self.on_go_to_beginning_clicked()
+        )
+        self.playback_controls.append(self.go_to_beginning_button)
+
         # Shuffle button
         self.shuffle_button = self.create_button(
             icon_name="media-playlist-shuffle", 
@@ -215,6 +222,10 @@ class PlaybackPanel(Gtk.Box, UIHelpersMixin):
     def on_volume_changed(self, scale):
         """Change the playback volume."""
         self.app.set_volume(scale.get_value() / 100)
+
+    def on_go_to_beginning_clicked(self):
+        """Go to the beginning of the current track."""
+        self.app.go_to_beginning()
 
     def _on_vu_meter_update(self, peak_levels: list[float], rms_levels: list[float]):
         """Callback to update the VU meter UI."""

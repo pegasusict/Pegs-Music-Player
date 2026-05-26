@@ -144,6 +144,10 @@ class PlayerController:
         self.engine.stop()
         return self.play_next()
 
+    def go_to_beginning(self):
+        """Seeks to the beginning of the current track."""
+        self.seek(0)
+
     # ----------------------------
     # Auto-chain playback
     # ----------------------------
