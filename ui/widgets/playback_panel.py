@@ -18,6 +18,8 @@ class PlaybackPanel(Gtk.Box, UIHelpersMixin):
         self.resume_last_button.connect("clicked", lambda _: self.on_resume_last_track())
         self.append(self.resume_last_button)
 
+        self.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
+
         # Horizontal box for playback controls
         self.playback_controls = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         self.playback_controls.set_homogeneous(True)
@@ -27,6 +29,8 @@ class PlaybackPanel(Gtk.Box, UIHelpersMixin):
         self.error_label.set_wrap(True)
         self.append(self.error_label)
 
+        self.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
+
         self.seek = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL,0,1,1)
         self.seek.set_draw_value(False)
         self.append(self.seek)
@@ -35,33 +39,63 @@ class PlaybackPanel(Gtk.Box, UIHelpersMixin):
         self.time_label = Gtk.Label(label="0:00 / 0:00")
         self.append(self.time_label)
 
-        self.volume_label = self.create_label("Volume")
-        self.append(self.volume_label)
+        self.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
 
-        self.volume = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL,0,100,1)
-        initial_volume_percent = round(self.app.get_volume() * 100)
-        self.volume.set_value(max(0, min(100, initial_volume_percent)))
-        self.volume.connect("value-changed", self.on_volume_changed)
-        self.append(self.volume)
-        
         # VU Meter
         self.vu_meter_label = self.create_label("VU Meter")
         self.append(self.vu_meter_label)
 
-        self.vu_meter_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        self.append(self.vu_meter_box)
+        # Mixer-style side-by-side vertical VU meters with a central dB scale
+        self.vu_meter_grid = Gtk.Grid()
+        self.vu_meter_grid.set_column_spacing(10)
+        self.vu_meter_grid.set_row_spacing(4)
+        self.vu_meter_grid.set_halign(Gtk.Align.CENTER)
+        self.append(self.vu_meter_grid)
 
-        self.vu_meter_left = Gtk.ProgressBar()
+        self.vu_meter_left = Gtk.ProgressBar(orientation=Gtk.Orientation.VERTICAL, inverted=True)
         self.vu_meter_left.set_fraction(0.0)
         self.vu_meter_left.add_css_class("vu-meter")
-        self.vu_meter_left.set_hexpand(True)
-        self.vu_meter_box.append(self.vu_meter_left)
+        self.vu_meter_left.set_vexpand(True)
+        self.vu_meter_grid.attach(self.vu_meter_left, 0, 0, 1, 1)
 
-        self.vu_meter_right = Gtk.ProgressBar()
+        # Central dB Scale Column
+        scale_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        for db_val in ["0", "-12", "-24", "-36", "-48", "-60"]:
+            lbl = self.create_label(db_val, max_chars=3, xalign=0.5, css_class="vu-scale-label")
+            lbl.set_vexpand(True)
+            scale_box.append(lbl)
+        self.vu_meter_grid.attach(scale_box, 1, 0, 1, 1)
+
+        self.vu_meter_right = Gtk.ProgressBar(orientation=Gtk.Orientation.VERTICAL, inverted=True)
         self.vu_meter_right.set_fraction(0.0)
         self.vu_meter_right.add_css_class("vu-meter")
-        self.vu_meter_right.set_hexpand(True)
-        self.vu_meter_box.append(self.vu_meter_right)
+        self.vu_meter_right.set_vexpand(True)
+        self.vu_meter_grid.attach(self.vu_meter_right, 2, 0, 1, 1)
+
+        # Channel indicators below the meters
+        self.vu_meter_grid.attach(self.create_label("L", xalign=0.5), 0, 1, 1, 1)
+        self.vu_meter_grid.attach(self.create_label("R", xalign=0.5), 2, 1, 1, 1)
+
+        # Vertical Separator between VU and Volume
+        v_sep = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
+        v_sep.set_margin_start(6)
+        v_sep.set_margin_end(6)
+        self.vu_meter_grid.attach(v_sep, 3, 0, 1, 1)
+
+        # Vertical Volume Slider (Fader)
+        self.volume = Gtk.Scale.new_with_range(Gtk.Orientation.VERTICAL, 0, 100, 1)
+        self.volume.set_inverted(True) # 100 at top, 0 at bottom
+        self.volume.set_draw_value(False)
+        self.volume.set_vexpand(True)
+        self.volume.add_css_class("volume-fader")
+        
+        initial_volume_percent = round(self.app.get_volume() * 100)
+        self.volume.set_value(max(0, min(100, initial_volume_percent)))
+        self.volume.connect("value-changed", self.on_volume_changed)
+        
+        self.vu_meter_grid.attach(self.volume, 4, 0, 1, 1)
+        self.volume_indicator = self.create_label("Vol", xalign=0.5)
+        self.vu_meter_grid.attach(self.volume_indicator, 4, 1, 1, 1)
 
         # Apply custom styling for the gradient
         self._setup_vu_meter_style()
@@ -69,7 +103,7 @@ class PlaybackPanel(Gtk.Box, UIHelpersMixin):
         self.play_button = self.create_button(
             icon_name="media-playback-start",
             tooltip="Play or Resume",
-            callback=self.play_or_resume
+            callback=lambda _: self.app.play_or_resume()
         )
         self.playback_controls.append(self.play_button)
 
@@ -83,14 +117,14 @@ class PlaybackPanel(Gtk.Box, UIHelpersMixin):
         self.stop_button = self.create_button(
             icon_name="media-playback-stop",
             tooltip="Stop",
-            callback=self.stop
+            callback=lambda _: self.app.stop()
         )
         self.playback_controls.append(self.stop_button)
 
         self.next_button = self.create_button(
-            icon_name="media-playback-next",
+            icon_name="media-skip-forward",
             tooltip="Next",
-            callback=self.on_next
+            callback=lambda _: self.app.skip()
         )
         self.playback_controls.append(self.next_button)
 
@@ -118,13 +152,26 @@ class PlaybackPanel(Gtk.Box, UIHelpersMixin):
         css_provider = Gtk.CssProvider()
         css_data = """
         .vu-meter progress {
-            background-image: linear-gradient(to right, #2ecc71 0%, #2ecc71 70%, #f1c40f 85%, #e74c3c 100%);
+            background-image: linear-gradient(to top, #2ecc71 0%, #2ecc71 65%, #f1c40f 85%, #e74c3c 100%);
             border-radius: 2px;
         }
         .vu-meter trough {
-            min-height: 10px;
+            min-width: 14px;
+            min-height: 80px;
             background-color: rgba(255, 255, 255, 0.05);
             border-radius: 2px;
+        }
+        .volume-fader trough {
+            min-width: 14px;
+            min-height: 80px;
+        }
+        .volume-fader slider {
+            border-radius: 0; /* Makes the slider handle rectangular */
+        }
+        .vu-scale-label {
+            font-size: 0.65rem;
+            color: rgba(255, 255, 255, 0.4);
+            font-family: monospace;
         }
         """
         css_provider.load_from_data(css_data.encode())
@@ -143,7 +190,7 @@ class PlaybackPanel(Gtk.Box, UIHelpersMixin):
         track = self.app.skip()
         self.main_window.update_track(track) # Call main_window to update global track info
 
-    def on_pause_resume(self):
+    def on_pause_resume(self, _button):
         """Toggle between pause and resume based on current playback state."""
         status = self.app.get_status()
 

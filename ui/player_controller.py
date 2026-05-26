@@ -319,7 +319,7 @@ class PlayerController:
 
     def get_shuffle_enabled(self) -> bool:
         """Gets the shuffle mode enabled state from the application backend."""
-        return self.app.selection_engine._shuffle_enabled
+        return self.app.selection_engine.get_shuffle_enabled()
 
     def _on_new_track_registered(self, track: Track) -> None:
         """Callback for when a new track is registered by the FileWatcher."""

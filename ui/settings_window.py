@@ -13,7 +13,7 @@ class SettingsWindow(Gtk.Window, UIHelpersMixin):
     def __init__(self, controller):
         super().__init__(title="Settings", modal=True)
         self.controller = controller
-        self.set_default_size(500, 450)
+        self.set_default_size(1000, 700)
 
         # Load current config directly from the source
         self.config = self.controller.app.get_raw_config()
@@ -37,17 +37,26 @@ class SettingsWindow(Gtk.Window, UIHelpersMixin):
         scroll.set_vexpand(True)
         main_box.append(scroll)
 
-        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
-        scroll.set_child(content_box)
+        # Main content layout using two columns to reduce vertical scrolling
+        columns_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=24)
+        scroll.set_child(columns_box)
+
+        left_column = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
+        left_column.set_hexpand(True)
+        columns_box.append(left_column)
+
+        right_column = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
+        right_column.set_hexpand(True)
+        columns_box.append(right_column)
 
         # Library & General Section
-        content_box.append(self.create_label("Library & General", css_class="title-4", xalign=0))
+        left_column.append(self.create_label("Library & General", css_class="title-4", xalign=0))
 
         # General Settings List
         list_box = Gtk.ListBox()
         list_box.set_selection_mode(Gtk.SelectionMode.NONE)
         list_box.add_css_class("boxed-list")
-        content_box.append(list_box)
+        left_column.append(list_box)
 
         # Editable fields
         self.base_folder_entry = self._add_path_row(
@@ -72,13 +81,13 @@ class SettingsWindow(Gtk.Window, UIHelpersMixin):
             tooltip="Fallback duration used for queue planning when a file's actual duration cannot be read from metadata.")
 
         # Playback Section
-        content_box.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
-        content_box.append(self.create_label("Playback", css_class="title-4", xalign=0))
+        left_column.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
+        left_column.append(self.create_label("Playback", css_class="title-4", xalign=0))
         
         playback_list = Gtk.ListBox()
         playback_list.set_selection_mode(Gtk.SelectionMode.NONE)
         playback_list.add_css_class("boxed-list")
-        content_box.append(playback_list)
+        left_column.append(playback_list)
 
         self.crossfade_spin = Gtk.SpinButton.new_with_range(0, 10, 0.1)
         self.crossfade_spin.set_value(float(self.config.get("crossfade_seconds", 3.5)))
@@ -90,14 +99,43 @@ class SettingsWindow(Gtk.Window, UIHelpersMixin):
         self._add_widget_row(playback_list, "UI Fade (sec)", self.ui_fade_spin,
                             tooltip="Duration of fades when pausing, stopping, or resuming.")
 
+        self.silence_threshold_spin = Gtk.SpinButton.new_with_range(-100, 0, 1)
+        self.silence_threshold_spin.set_value(float(self.config.get("silence_threshold_db", -60.0)))
+        self._add_widget_row(playback_list, "Silence Threshold (dB)", self.silence_threshold_spin,
+                            tooltip="Audio levels below this threshold are treated as silence and trimmed.")
+
+        # Logging Section
+        left_column.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
+        left_column.append(self.create_label("Logging", css_class="title-4", xalign=0))
+
+        log_list = Gtk.ListBox()
+        log_list.set_selection_mode(Gtk.SelectionMode.NONE)
+        log_list.add_css_class("boxed-list")
+        left_column.append(log_list)
+
+        levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+        self.log_level_combo = Gtk.ComboBoxText()
+        for lvl in levels:
+            self.log_level_combo.append_text(lvl)
+        current_lvl = self.config.get("logging", {}).get("level", "INFO")
+        self.log_level_combo.set_active(levels.index(current_lvl) if current_lvl in levels else 1)
+        self._add_widget_row(
+            log_list, "Log Level", self.log_level_combo,
+            tooltip="Controls the verbosity of the logs. DEBUG is the most detailed."
+        )
+
+        self.log_file_entry = self._add_entry_row(
+            log_list, "Log File Path", self.config.get("logging", {}).get("file", ""),
+            tooltip="Path to the log file. Absolute paths are used as-is; relative paths are stored in the user cache."
+        )
+
         # Compressor Section
-        content_box.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
-        content_box.append(self.create_label("Dynamic Compression (SC4)", css_class="title-4", xalign=0))
+        right_column.append(self.create_label("Dynamic Compression (SC4)", css_class="title-4", xalign=0))
         
         comp_list = Gtk.ListBox()
         comp_list.set_selection_mode(Gtk.SelectionMode.NONE)
         comp_list.add_css_class("boxed-list")
-        content_box.append(comp_list)
+        right_column.append(comp_list)
 
         comp_cfg = self.config.get("compressor", {})
         
@@ -121,45 +159,18 @@ class SettingsWindow(Gtk.Window, UIHelpersMixin):
         self.comp_gain_spin.set_value(float(comp_cfg.get("makeup_gain", 0.0)))
         self._add_widget_row(comp_list, "Makeup Gain (dB)", self.comp_gain_spin, tooltip="Boost the signal after compression.")
 
-        # Separator
-        content_box.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
-
-        # Logging Section
-        content_box.append(self.create_label("Logging", css_class="title-4", xalign=0))
-
-        log_list = Gtk.ListBox()
-        log_list.set_selection_mode(Gtk.SelectionMode.NONE)
-        log_list.add_css_class("boxed-list")
-        content_box.append(log_list)
-
-        levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
-        self.log_level_combo = Gtk.ComboBoxText()
-        for lvl in levels:
-            self.log_level_combo.append_text(lvl)
-        current_lvl = self.config.get("logging", {}).get("level", "INFO")
-        self.log_level_combo.set_active(levels.index(current_lvl) if current_lvl in levels else 1)
-        self._add_widget_row(
-            log_list, "Log Level", self.log_level_combo,
-            tooltip="Controls the verbosity of the logs. DEBUG is the most detailed."
-        )
-
-        self.log_file_entry = self._add_entry_row(
-            log_list, "Log File Path", self.config.get("logging", {}).get("file", ""),
-            tooltip="Path to the log file. Absolute paths are used as-is; relative paths are stored in the user cache."
-        )
-
-        # Separator
-        content_box.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
+        # Timeslots Separator
+        right_column.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
 
         # Timeslots Section
         ts_header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        ts_header.append(self.create_label("Timeslots", css_class="title-4", xalign=0))
+        ts_header.append(self.create_label("Timeslots", css_class="title-4", xalign=0, hexpand=True))
         
         ts_header.append(self.create_button("Add Slot", callback=lambda _: self._add_timeslot_ui()))
-        content_box.append(ts_header)
+        right_column.append(ts_header)
 
         self.timeslots_container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        content_box.append(self.timeslots_container)
+        right_column.append(self.timeslots_container)
 
         for slot in self.config.get("timeslots", []):
             self._add_timeslot_ui(slot)
@@ -335,6 +346,7 @@ class SettingsWindow(Gtk.Window, UIHelpersMixin):
         self.config["average_track_duration_seconds"] = int(self.duration_spin.get_value())
         self.config["crossfade_seconds"] = float(self.crossfade_spin.get_value())
         self.config["ui_fade_seconds"] = float(self.ui_fade_spin.get_value())
+        self.config["silence_threshold_db"] = float(self.silence_threshold_spin.get_value())
         self.config["compressor"] = {
             "rms_peak": 0.0, # Kept at 0.0 default
             "attack_time": float(self.comp_attack_spin.get_value()),
@@ -409,6 +421,7 @@ class SettingsWindow(Gtk.Window, UIHelpersMixin):
         self.duration_spin.set_value(float(defaults.get("average_track_duration_seconds", 210)))
         self.crossfade_spin.set_value(float(defaults.get("crossfade_seconds", 3.5)))
         self.ui_fade_spin.set_value(float(defaults.get("ui_fade_seconds", 0.25)))
+        self.silence_threshold_spin.set_value(float(defaults.get("silence_threshold_db", -60.0)))
 
         comp_defaults = defaults.get("compressor", {})
         self.comp_threshold_spin.set_value(float(comp_defaults.get("threshold_level", -20.0)))

@@ -62,14 +62,21 @@ class QueueManager:
         """Returns the next track to play, prioritizing the manual queue."""
         with self._lock:
             if self._manual_queue:
-                return self._manual_queue.popleft()
+                track = self._manual_queue.popleft()
+                self.selection_engine.update_last_artist(track)
+                return track
 
-            # If autoqueue is low, try to repopulate before getting a track
+            # Always try to repopulate if low, before getting a track.
+            # This ensures we always try to have enough tracks if possible.
             if len(self._auto_queue) < self._autoqueue_target_size:
                 self._repopulate_autoqueue()
 
             if self._auto_queue:
-                return self._auto_queue.popleft()
+                track = self._auto_queue.popleft()
+                # After popping a track from autoqueue, immediately try to repopulate
+                # to maintain the target size for the next call.
+                self._repopulate_autoqueue()
+                return track
 
             return None
 

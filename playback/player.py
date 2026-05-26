@@ -17,11 +17,15 @@ class PlaybackEngine:
     def __init__(self):
         Gst.init(None)
 
+        # Initialize tracking attributes before creating players to prevent 
+        # AttributeError/IndexError if GStreamer signals fire immediately.
+        self._players = []
+        self._active_index = 0
+
         # We use two playbins to allow overlapping audio during crossfades
         self._player_a = self._create_player("player_a")
         self._player_b = self._create_player("player_b")
         self._players = [self._player_a, self._player_b]
-        self._active_index = 0
 
         # Configuration
         self._on_track_end = None
@@ -34,11 +38,14 @@ class PlaybackEngine:
         self._ui_fade_duration = 0.25
 
     def _create_player(self, name: str) -> Gst.Element:
-        player = Gst.ElementFactory.make("playbin", name)
+        player = Gst.ElementFactory.make("playbin3", name)
         if not player:
             logger.critical(f"GStreamer 'playbin' ({name}) could not be created.")
             import sys
             sys.exit(1)
+
+        # Ensure the playbin starts with a neutral volume (1.0 = 100%)
+        player.set_property("volume", 1.0)
 
         bus = player.get_bus()
         bus.add_signal_watch()
@@ -48,9 +55,11 @@ class PlaybackEngine:
         try:
             norm_filter = Gst.parse_bin_from_description(
                 "audioconvert ! audioresample ! "
+                "cutter name=silence_trimmer threshold-db=-60 run-length=100000000 pre-length=20000000 ! "
                 "rgvolume ! "
                 "ladspa-sc4-1882-so-sc4 name=compressor ! "
                 "ladspa-fast-lookahead-limiter-1913-so-fastlookaheadlimiter limit=-1 release-time=0.1 ! " # Limiter
+                "volume name=fader ! " # Dedicated element for fades and volume
                 "level name=vu_meter interval=100000000 post-messages=true ! " # VU Meter (100ms interval)
                 "audioconvert", True
             )
@@ -59,8 +68,40 @@ class PlaybackEngine:
         except Exception as e:
             self._limiter_available = False
             logger.warning(f"LADSPA processing chain failed for {name}: {e}")
-        self.update_audio_filters()
+        self._configure_player_filters(player)
         
+        return player
+    
+    def _configure_player_filters(self, player: Gst.Element):
+        """Applies current filter and compressor settings to a player's audio filter bin."""
+        audio_filter_bin = player.get_property("audio-filter")
+        if not audio_filter_bin:
+            return
+
+        # Silence Trimmer
+        trimmer = audio_filter_bin.get_by_name("silence_trimmer")
+        if trimmer:
+            try:
+                trimmer.set_property("threshold-db", float(config.SILENCE_THRESHOLD))
+            except Exception as e:
+                logger.error(f"Failed to update silence trimmer threshold: {e}")
+
+        # Compressor
+        compressor = audio_filter_bin.get_by_name("compressor")
+        if compressor:
+            for prop, value in config.COMPRESSOR_SETTINGS.items():
+                try:
+                    compressor.set_property(prop, value)
+                except Exception as e:
+                    logger.error(f"Failed to update compressor property {prop}: {e}")
+
+    def _get_fade_target(self, player: Gst.Element) -> Gst.Element:
+        """Returns the internal fader element if available, otherwise falls back to the player bin."""
+        audio_filter_bin = player.get_property("audio-filter")
+        if audio_filter_bin:
+            fader = audio_filter_bin.get_by_name("fader")
+            if fader:
+                return fader
         return player
 
     def _get_active_player(self):
@@ -69,13 +110,28 @@ class PlaybackEngine:
     def _get_inactive_player(self):
         return self._players[1 - self._active_index]
 
-    def _apply_fade(self, player, start_vol, end_vol, duration_sec):
+    def _apply_fade(self, player_or_element, start_vol, end_vol, duration_sec):
         """Smoothly ramps volume using GStreamer's Controller API."""
+        # Remove existing binding to prevent collisions and 'pspec' assertion failures
+        existing = player_or_element.get_control_binding("volume")
+        if existing:
+            player_or_element.remove_control_binding(existing)
+
+        if duration_sec <= 0:
+            player_or_element.set_property("volume", end_vol)
+            return
+
         cs = GstController.InterpolationControlSource()
         cs.set_property("mode", GstController.InterpolationMode.LINEAR)
         
         # Bind the control source to the 'volume' property of the playbin
-        player.add_control_binding(Gst.DirectControlBinding.new(player, "volume", cs))
+        binding = GstController.DirectControlBinding.new(player_or_element, "volume", cs)
+        if not binding:
+            logger.error("Failed to create DirectControlBinding for volume")
+            player_or_element.set_property("volume", end_vol)
+            return
+            
+        player_or_element.add_control_binding(binding)
         
         duration_ns = int(duration_sec * Gst.SECOND)
         # Set the ramp points (relative to the start of the fade)
@@ -84,19 +140,8 @@ class PlaybackEngine:
 
     def update_audio_filters(self):
         """Updates the compressor element properties on all players using current config."""
-        for p in self._players:
-            # The 'audio-filter' property holds the GstBin we created
-            audio_filter_bin = p.get_property("audio-filter")
-            if not audio_filter_bin:
-                continue
-
-            compressor = audio_filter_bin.get_by_name("compressor")
-            if compressor:
-                for prop, value in config.COMPRESSOR_SETTINGS.items():
-                    try:
-                        compressor.set_property(prop, value)
-                    except Exception as e:
-                        logger.error(f"Failed to update compressor property {prop}: {e}")
+        for player in self._players:
+            self._configure_player_filters(player)
 
     # -------------------------------------------------
     # Basic control
@@ -115,37 +160,41 @@ class PlaybackEngine:
         replaygain_track_peak: float | None = None,
     ):
         old_player = self._get_active_player()
+        is_crossfading = self._state == "playing" and self._crossfade_duration > 0
         
         # Switch active player
         self._active_index = 1 - self._active_index
         new_player = self._get_active_player()
+        self._state = "playing"
 
         self._track_gain_multiplier = self._replaygain_multiplier(
             replaygain_track_gain_db,
             replaygain_track_peak,
         )
+        
+        # Use the fader element for the volume ramp
+        new_fader = self._get_fade_target(new_player)
+        old_fader = self._get_fade_target(old_player)
         target_vol = self._user_volume * self._track_gain_multiplier
 
-        new_player.set_state(Gst.State.READY)
         new_player.set_property("uri", self._to_uri(path))
+        new_player.set_state(Gst.State.READY)
 
-        if self._state == "playing" and self._crossfade_duration > 0:
+        if is_crossfading:
             # Crossfade: Fade out current, fade in next
-            self._apply_fade(old_player, old_player.get_property("volume"), 0.0, self._crossfade_duration)
+            self._apply_fade(old_fader, old_fader.get_property("volume"), 0.0, self._crossfade_duration)
             
-            new_player.set_property("volume", 0.0)
+            new_fader.set_property("volume", 0.0)
             new_player.set_state(Gst.State.PLAYING)
-            self._apply_fade(new_player, 0.0, target_vol, self._crossfade_duration)
+            self._apply_fade(new_fader, 0.0, target_vol, self._crossfade_duration)
             
             # Clean up old player after fade completes
             GLib.timeout_add(int(self._crossfade_duration * 1000), old_player.set_state, Gst.State.NULL)
         else:
-            # Cold start or stopped state
-            new_player.set_property("volume", target_vol)
-            new_player.set_state(Gst.State.PLAYING)
+            # Cold start or stopped state: release device from old player first
             old_player.set_state(Gst.State.NULL)
-
-        self._state = "playing"
+            new_fader.set_property("volume", target_vol)
+            new_player.set_state(Gst.State.PLAYING)
 
     def shutdown(self):
         for p in self._players:
@@ -154,7 +203,8 @@ class PlaybackEngine:
 
     def stop(self):
         active = self._get_active_player()
-        self._apply_fade(active, active.get_property("volume"), 0.0, self._ui_fade_duration)
+        fader = self._get_fade_target(active)
+        self._apply_fade(fader, fader.get_property("volume"), 0.0, self._ui_fade_duration)
         
         def finish_stop():
             for p in self._players:
@@ -166,7 +216,8 @@ class PlaybackEngine:
 
     def pause(self):
         active = self._get_active_player()
-        self._apply_fade(active, active.get_property("volume"), 0.0, self._ui_fade_duration)
+        fader = self._get_fade_target(active)
+        self._apply_fade(fader, fader.get_property("volume"), 0.0, self._ui_fade_duration)
         
         def finish_pause():
             active.set_state(Gst.State.PAUSED)
@@ -177,11 +228,12 @@ class PlaybackEngine:
 
     def resume(self):
         active = self._get_active_player()
+        fader = self._get_fade_target(active)
         target_vol = self._user_volume * self._track_gain_multiplier
         
-        active.set_property("volume", 0.0)
+        fader.set_property("volume", 0.0)
         active.set_state(Gst.State.PLAYING)
-        self._apply_fade(active, 0.0, target_vol, self._ui_fade_duration)
+        self._apply_fade(fader, 0.0, target_vol, self._ui_fade_duration)
         self._state = "playing"
 
     def set_volume(self, volume: float):
@@ -257,8 +309,8 @@ class PlaybackEngine:
                         structure = message.get_structure()
                         if structure and structure.get_name() == "level":
                             # The 'level' element posts messages with 'peak' and 'rms' arrays
-                            peak_values = [structure.get_nth_double("peak", i) for i in range(structure.n_fields("peak"))]
-                            rms_values = [structure.get_nth_double("rms", i) for i in range(structure.n_fields("rms"))]
+                            peak_values = structure.get_value("peak")
+                            rms_values = structure.get_value("rms")
                             
                             # Convert dB to linear scale (0.0 to 1.0) for UI (assuming -60dB to 0dB range)
                             peak_linear = [min(1.0, max(0.0, (v + 60.0) / 60.0)) for v in peak_values]
@@ -275,7 +327,8 @@ class PlaybackEngine:
 
     def _apply_effective_volume(self) -> None:
         effective_volume = self._user_volume * self._track_gain_multiplier
-        self._get_active_player().set_property("volume", max(0.0, min(4.0, effective_volume)))
+        target = self._get_fade_target(self._get_active_player())
+        target.set_property("volume", max(0.0, min(4.0, effective_volume)))
 
     def _replaygain_multiplier(
         self,

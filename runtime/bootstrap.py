@@ -40,9 +40,13 @@ class Application:
 
         # Load state from DB early to identify potential locking issues 
         # before initializing heavy external components like GStreamer.
-        logger.debug("Loading saved volume from database...")
-        saved_volume = self.load_volume()
-        logger.debug(f"Volume loaded: {saved_volume}")
+        logger.debug("Loading initial application state from database...")
+        initial_volume = self.load_volume()
+        initial_shuffle = self.load_shuffle_state()
+        logger.debug(f"State loaded: volume={initial_volume}, shuffle={initial_shuffle}")
+
+        # Load configuration once
+        raw_config = config.load_config()
 
         logger.debug("Initializing repositories...")
         # Core Infrastructure
@@ -50,7 +54,7 @@ class Application:
         
         # Scheduler
         logger.debug("Building timeslots...")
-        self.scheduler = TimeslotScheduler(self._build_timeslots_from_raw_config(config.load_config()))
+        self.scheduler = TimeslotScheduler(self._build_timeslots_from_raw_config(raw_config))
         
         # Spread Infrastructure
         self.spread_repo = SpreadStateRepository(database) # type: ignore
@@ -80,7 +84,6 @@ class Application:
         self.selection_engine = SelectionEngine(
             music_repo=self.music_repo,
             spread_repo=self.spread_repo,
-            queue=self.queue_manager,
             scheduler=self.scheduler,
             daily_spread=self.daily_spread,
             slot_spread=self.slot_spread,
@@ -89,17 +92,14 @@ class Application:
         self.queue_manager = QueueManager(
             selection_engine=self.selection_engine
         )
-        # Load and apply shuffle state immediately after selection_engine is created
-        initial_shuffle_state = self.load_shuffle_state()
-        self.selection_engine.set_shuffle_enabled(initial_shuffle_state)
+        # Apply shuffle state
+        self.selection_engine.set_shuffle_enabled(initial_shuffle)
 
         # Playback
         logger.debug("Initializing PlaybackEngine (GStreamer)...")
         self.playback_engine = PlaybackEngine()
-        logger.debug("Calling load_volume() (Database query)...")
-        saved_volume = self.load_volume()
-        logger.debug(f"load_volume() returned {saved_volume}. Applying to engine...")
-        self.playback_engine.set_volume(saved_volume)
+        logger.debug(f"Applying volume {initial_volume} to engine...")
+        self.playback_engine.set_volume(initial_volume)
         self.playback_engine.set_crossfade_duration(config.CROSSFADE_SECONDS)
         self.playback_engine.set_ui_fade_duration(config.UI_FADE_SECONDS)
         logger.debug("Finalizing bootstrap initialization.")
@@ -297,7 +297,7 @@ class Application:
     def persist_state(self, current_track=None, position: int | None = None) -> None:
         self.queue_manager.persist(self.database)
         self.save_volume(self.playback_engine.get_volume())
-        self.save_shuffle_state(self.selection_engine._shuffle_enabled) # Save shuffle state
+        self.save_shuffle_state(self.selection_engine.get_shuffle_enabled()) # Save shuffle state
         self.save_stop_at_end_state(self._stop_at_end_enabled)
         self.save_autoqueue_state(self._autoqueue_enabled)
 

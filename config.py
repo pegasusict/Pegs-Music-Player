@@ -23,6 +23,7 @@ LOG_LEVEL: str
 LOG_FILE: str
 CROSSFADE_SECONDS: float
 UI_FADE_SECONDS: float
+SILENCE_THRESHOLD: float
 AUTOQUEUE_PREPOPULATE_COUNT: int
 COMPRESSOR_SETTINGS: Dict[str, float]
 
@@ -34,6 +35,7 @@ DEFAULT_CONFIG_SCHEMA: Dict[str, Any] = {
     "average_track_duration_seconds": 210,
     "crossfade_seconds": 3.5,
     "ui_fade_seconds": 0.25,
+    "silence_threshold_db": -60.0,
     "autoqueue_prepopulate_count": 5,
     "supported_extensions": [".mp3", ".flac", ".ogg", ".m4a", ".wav", ".aac", ".mp2"], # Supported audio file extensions
     "compressor": {
@@ -172,7 +174,7 @@ def load_config() -> dict[str, Any]:
 
 def _update_module_globals(cfg: Dict[str, Any]):
     """Updates the module-level global variables with values from the provided config."""
-    global DB_PATH, BASE_FOLDER, SUPPORTED_EXTENSIONS, AVERAGE_TRACK_DURATION_SECONDS, DAILY_FOLDER, TIMESLOTS, LOG_LEVEL, LOG_FILE, CROSSFADE_SECONDS, UI_FADE_SECONDS, COMPRESSOR_SETTINGS, AUTOQUEUE_PREPOPULATE_COUNT
+    global DB_PATH, BASE_FOLDER, SUPPORTED_EXTENSIONS, AVERAGE_TRACK_DURATION_SECONDS, DAILY_FOLDER, TIMESLOTS, LOG_LEVEL, LOG_FILE, CROSSFADE_SECONDS, UI_FADE_SECONDS, SILENCE_THRESHOLD, COMPRESSOR_SETTINGS, AUTOQUEUE_PREPOPULATE_COUNT
     
     DB_PATH = str(Path(cfg["db_path"]).expanduser())
     BASE_FOLDER = Path(cfg["base_folder"]).expanduser()
@@ -183,6 +185,7 @@ def _update_module_globals(cfg: Dict[str, Any]):
     LOG_FILE = cfg.get("logging", {}).get("file", "~/.cache/pegasus-player/pegasus_player.log")
     CROSSFADE_SECONDS = float(cfg.get("crossfade_seconds", 3.5))
     UI_FADE_SECONDS = float(cfg.get("ui_fade_seconds", 0.25))
+    SILENCE_THRESHOLD = float(cfg.get("silence_threshold_db", -60.0))
     AUTOQUEUE_PREPOPULATE_COUNT = int(cfg.get("autoqueue_prepopulate_count", 5))
 
     # Map config (underscores) to GStreamer LADSPA properties (hyphens)
